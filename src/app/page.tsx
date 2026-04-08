@@ -142,7 +142,6 @@ export default async function DashboardPage() {
                   href={client.drive_url}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={e => e.stopPropagation()}
                   className="text-blue-500 hover:underline"
                 >
                   Drive ↗
