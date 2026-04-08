@@ -31,6 +31,7 @@ export interface Asset {
   posted_by: string | null
   notes: string | null
   slack_message_ts: string | null
+  slack_channel_id: string | null
   created_at: string
   updated_at: string
   // joined
