@@ -45,12 +45,6 @@ async function verifySlackSignature(req: NextRequest, rawBody: string): Promise<
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
 
-  // Verify signature
-  const valid = await verifySlackSignature(req, rawBody)
-  if (!valid) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-  }
-
   let payload: Record<string, unknown>
   try {
     payload = JSON.parse(rawBody)
@@ -58,9 +52,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bad JSON' }, { status: 400 })
   }
 
-  // Slack URL verification challenge (one-time during app setup)
+  // Slack URL verification challenge — must respond before signature check
+  // because the signing secret isn't known yet during initial setup
   if (payload.type === 'url_verification') {
     return NextResponse.json({ challenge: payload.challenge })
+  }
+
+  // Verify signature for all other requests
+  const valid = await verifySlackSignature(req, rawBody)
+  if (!valid) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   // Only handle events from our channel
