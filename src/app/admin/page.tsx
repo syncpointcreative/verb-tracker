@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [tab, setTab]               = useState<'deliveries' | 'assets' | 'add'>('deliveries')
   const [saving, setSaving]         = useState<string | null>(null)
   const [toast, setToast]           = useState<string | null>(null)
+  const [syncing, setSyncing]       = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -68,6 +69,27 @@ export default function AdminPage() {
     setSaving(null)
     showToast('Saved ✓')
     setDeliveries(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d))
+  }
+
+  const syncDeliveries = async () => {
+    setSyncing(true)
+    try {
+      const now = new Date()
+      const res = await fetch('/api/deliveries/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(data.message ?? 'Sync complete ✓')
+      load()
+    } catch (err) {
+      showToast('Sync failed — check console')
+      console.error(err)
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const addDeliveryMonth = async (clientId: string, month: string) => {
@@ -189,6 +211,24 @@ export default function AdminPage() {
       {/* ── TAB: Monthly Deliveries ────────────────────────────────────────────── */}
       {tab === 'deliveries' && (
         <div className="space-y-6">
+          {/* Sync banner */}
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-blue-800">Sync from Assets Table</p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Counts all assets with a date in the current month and updates delivered numbers.
+                Run this every Monday — assets removed from the table won&apos;t be counted.
+              </p>
+            </div>
+            <button
+              onClick={syncDeliveries}
+              disabled={syncing}
+              className="ml-4 shrink-0 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {syncing ? 'Syncing…' : '↻ Sync This Month'}
+            </button>
+          </div>
+
           {Object.entries(deliveriesByMonth)
             .sort((a, b) => b[0].localeCompare(a[0]))
             .map(([month, rows]) => (
