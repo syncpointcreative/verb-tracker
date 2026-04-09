@@ -1,7 +1,9 @@
 /**
  * Parses a filename using the VERB naming convention:
- * CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]
- * e.g. BIOM-APW-UGC-DB-040726.mp4
+ * CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]   (new format, 6 parts)
+ * CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]          (legacy format, 5 parts)
+ * e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
+ *      BIOM-APW-UGC-DB-040726.mp4
  */
 import { CLIENT_CODES, PRODUCT_CODES, TYPE_CODES, CREATOR_CODES } from './constants'
 import { Stage } from './supabase'
@@ -11,6 +13,7 @@ export interface ParsedFilename {
   productName: string | null
   contentType: string | null
   postedBy: string | null
+  title: string | null
   dateAdded: Date | null
   hasCaption: boolean
   confidence: 'high' | 'low'  // high = matched naming convention, low = guessed from context
@@ -21,8 +24,23 @@ export function parseFilename(filename: string): ParsedFilename {
   const base = filename.replace(/\.[^.]+$/, '').toUpperCase()
   const hasCaption = base.includes('CAPTION')
 
-  // Try structured format: CLIENT-PRODUCT-TYPE-CREATOR-DATE
   const parts = base.split('-')
+
+  // Try new 6-part format: CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE
+  if (parts.length >= 6) {
+    const clientName  = CLIENT_CODES[parts[0]] ?? null
+    const productName = PRODUCT_CODES[parts[1]] ?? null
+    const contentType = TYPE_CODES[parts[2]] ?? null
+    const postedBy    = CREATOR_CODES[parts[3]] ?? null
+    const title       = parts[4] ? toTitleCase(parts[4]) : null
+    const dateAdded   = parseDateCode(parts[5])
+
+    if (clientName && productName) {
+      return { clientName, productName, contentType, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
+    }
+  }
+
+  // Try legacy 5-part format: CLIENT-PRODUCT-TYPE-CREATOR-DATE
   if (parts.length >= 4) {
     const clientName  = CLIENT_CODES[parts[0]] ?? null
     const productName = PRODUCT_CODES[parts[1]] ?? null
@@ -31,7 +49,7 @@ export function parseFilename(filename: string): ParsedFilename {
     const dateAdded   = parseDateCode(parts[4])
 
     if (clientName && productName) {
-      return { clientName, productName, contentType, postedBy, dateAdded, hasCaption, confidence: 'high' }
+      return { clientName, productName, contentType, postedBy, title: null, dateAdded, hasCaption, confidence: 'high' }
     }
   }
 
@@ -46,10 +64,23 @@ export function parseFilename(filename: string): ParsedFilename {
     productName: null,
     contentType: null,
     postedBy: null,
+    title: null,
     dateAdded: extractDateFromFilename(base),
     hasCaption,
     confidence: 'low',
   }
+}
+
+function toTitleCase(slug: string): string {
+  // Convert CamelCase or underscore slugs to readable title
+  return slug
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 }
 
 function parseDateCode(code: string | undefined): Date | null {
