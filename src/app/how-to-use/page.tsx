@@ -128,6 +128,8 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'SP',  name: 'Sampler Pack' },
       { code: 'SHK', name: 'Shaker Bottles' },
       { code: 'EP',  name: 'Electrolyte Packs' },
+      { code: 'FVP', name: 'Variety Pack' },
+      { code: 'AF',  name: 'Any Flavor' },
     ],
   },
   {
