@@ -61,7 +61,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   HH: 'Himalayan Honey (2lb Tub)',
   OBL: 'Ocean Breeze Laundry Detergent Sheets',
   DP: 'Dishwashing Eco Pods', LDS: 'Lemon Detergent Eco Sheets for Dishwashing',
-  SP: 'Sampler Pack', CR: 'Cinnamon Roll',
+  CR: 'Cinnamon Roll',
   PC: 'Pineapple Coconut', SC: 'Salted Caramel',
   CPB: 'Chocolate Peanut Butter', CC: 'Cookies & Cream',
   MC: 'Mint Chocolate', EP: 'Electrolyte Packs',
@@ -71,6 +71,7 @@ export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',
   CRL: 'Creator-Led', TREV: 'Testimonial / Review',
   TUT: 'Tutorial / How-To', TRD: 'Trend-Led', PROMO: 'Promotional',
+  SI: 'Static Imagery', MG: 'Motion Graphics', AFF: 'Affiliate Video',
 }
 export const CREATOR_CODES: Record<string, string> = {
   DB: 'David Butler', MA: 'Mitchell Allen', MP: 'Mia Pistilli',

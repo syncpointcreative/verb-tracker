@@ -125,7 +125,6 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'BAN', name: 'Banana Bread' },
       { code: 'BLU', name: 'Blueberry Muffin' },
       { code: 'SC',  name: 'Salted Caramel' },
-      { code: 'SP',  name: 'Sampler Pack' },
       { code: 'SHK', name: 'Shaker Bottles' },
       { code: 'EP',  name: 'Electrolyte Packs' },
       { code: 'FVP', name: 'Variety Pack' },
@@ -149,6 +148,9 @@ const TYPE_CODES = [
   { code: 'TUT',   name: 'Tutorial / How-To' },
   { code: 'TRD',   name: 'Trend-Led' },
   { code: 'PROMO', name: 'Promotional' },
+  { code: 'SI',    name: 'Static Imagery' },
+  { code: 'MG',    name: 'Motion Graphics' },
+  { code: 'AFF',   name: 'Affiliate Video' },
 ]
 
 const CREATOR_CODES = [
