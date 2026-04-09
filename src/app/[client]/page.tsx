@@ -1,24 +1,15 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { STAGE_CONFIG, STAGES, STATUS_CONFIG, TARGET_ASSETS_PER_STAGE, EXPIRY_DAYS } from '@/lib/constants'
+import { STAGE_CONFIG, STAGES, TARGET_ASSETS_PER_STAGE, EXPIRY_DAYS } from '@/lib/constants'
 import type { Asset, Product, Stage } from '@/lib/supabase'
+import AssetTable from './AssetTable'
+
 
 interface Props {
   params: { client: string }
 }
 
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-}
-
-function isExpired(dateStr: string | null): boolean {
-  if (!dateStr) return false
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS)
-  return new Date(dateStr) < cutoff
-}
 
 export const revalidate = 60
 
@@ -132,72 +123,8 @@ export default async function ClientPage({ params }: Props) {
         )}
       </div>
 
-      {/* Asset tables by stage */}
-      {STAGES.map(stage => {
-        const stageAssets = byStage[stage]
-        const cfg = STAGE_CONFIG[stage]
-        return (
-          <div key={stage} className="mb-8">
-            {/* Stage header */}
-            <div className={`${cfg.headerBg} text-white px-4 py-2.5 rounded-t-lg flex items-center justify-between`}>
-              <div>
-                <span className="font-semibold">{cfg.label}</span>
-                <span className="ml-2 text-xs opacity-80">— {cfg.description}</span>
-              </div>
-              <span className="text-xs opacity-80">{stageAssets.length} asset{stageAssets.length !== 1 ? 's' : ''}</span>
-            </div>
-
-            {stageAssets.length === 0 ? (
-              <div className={`${cfg.lightBg} border border-t-0 ${cfg.border} rounded-b-lg px-4 py-6 text-center text-sm text-gray-500`}>
-                No assets yet — add via Slack or manually
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
-                  <thead>
-                    <tr className={`${cfg.lightBg} border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide`}>
-                      <th className="text-left px-3 py-2 w-36">Product</th>
-                      <th className="text-left px-3 py-2">Asset Name</th>
-                      <th className="text-left px-3 py-2 w-32">Content Type</th>
-                      <th className="text-left px-3 py-2 w-24">Status</th>
-                      <th className="text-left px-3 py-2 w-24">Date Added</th>
-                      <th className="text-left px-3 py-2 w-24">Posted By</th>
-                      <th className="text-left px-3 py-2">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {stageAssets.map((asset, i) => {
-                      const expired = isExpired(asset.date_added)
-                      const statusCfg = STATUS_CONFIG[asset.status]
-                      return (
-                        <tr
-                          key={asset.id}
-                          className={`${i % 2 === 0 ? 'bg-white' : cfg.rowBg} ${expired ? 'opacity-50' : ''} hover:bg-gray-50`}
-                        >
-                          <td className="px-3 py-2 text-gray-700 font-medium text-xs">
-                            {(asset.product as Product)?.name ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-900">{asset.asset_name}</td>
-                          <td className="px-3 py-2 text-gray-600">{asset.content_type ?? '—'}</td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusCfg.bg} ${statusCfg.text}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
-                              {asset.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-gray-500 text-xs">{formatDate(asset.date_added)}</td>
-                          <td className="px-3 py-2 text-gray-500 text-xs">{asset.posted_by ?? '—'}</td>
-                          <td className="px-3 py-2 text-gray-400 text-xs">{asset.notes ?? ''}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {/* Asset tables by stage — interactive (notes editable, freshness meter) */}
+      <AssetTable assets={allAssets} />
 
       {/* Missing Coverage */}
       {missingCoverage.length > 0 && (

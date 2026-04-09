@@ -357,8 +357,17 @@ export default function AdminPage() {
                       {clientAssets.map(asset => (
                         <tr key={asset.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5 text-gray-800">
-                            <div>{asset.asset_name}</div>
-                            {asset.file_name && <div className="text-xs text-gray-400 font-mono">{asset.file_name}</div>}
+                            <input
+                              type="text"
+                              defaultValue={asset.asset_name}
+                              onBlur={e => {
+                                const v = e.target.value.trim()
+                                if (v && v !== asset.asset_name) updateAsset(asset.id, 'asset_name', v)
+                              }}
+                              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                              className="w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none py-0.5 text-sm text-gray-800 font-medium"
+                            />
+                            {asset.file_name && <div className="text-xs text-gray-400 font-mono mt-0.5">{asset.file_name}</div>}
                           </td>
                           <td className="px-4 py-2.5">
                             <select
