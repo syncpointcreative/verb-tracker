@@ -40,6 +40,57 @@ async function verifySlackSignature(req: NextRequest, rawBody: string): Promise<
   }
 }
 
+// ─── Delivery counter refresh ─────────────────────────────────────────────────
+// Called after each successful asset insert.
+// Sets delivered = baseline_delivered + count(assets this month for client).
+// This way manual baselines are preserved and new Slack uploads stack on top.
+
+async function refreshDeliveredCount(
+  supabase: ReturnType<typeof createServerClient>,
+  clientId: string
+) {
+  try {
+    const now = new Date()
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    const nextMonth  = now.getMonth() === 11
+      ? `${now.getFullYear() + 1}-01-01`
+      : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}-01`
+
+    // Count assets for this client in the current month
+    const { count } = await supabase
+      .from('assets')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .gte('date_added', monthStart)
+      .lt('date_added', nextMonth)
+
+    const assetCount = count ?? 0
+
+    // Get existing delivery row for baseline
+    const { data: row } = await supabase
+      .from('monthly_deliveries')
+      .select('id, quota, baseline_delivered')
+      .eq('client_id', clientId)
+      .eq('month', monthStart)
+      .single()
+
+    const baseline = row?.baseline_delivered ?? 0
+    const quota    = row?.quota ?? 30
+
+    // Upsert with updated delivered total
+    await supabase.from('monthly_deliveries').upsert({
+      client_id:          clientId,
+      month:              monthStart,
+      quota,
+      baseline_delivered: baseline,
+      delivered:          baseline + assetCount,
+    }, { onConflict: 'client_id,month' })
+  } catch (err) {
+    // Non-fatal — log but don't block the webhook response
+    console.error('refreshDeliveredCount error:', err)
+  }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -146,7 +197,11 @@ export async function POST(req: NextRequest) {
       .upsert(asset, { onConflict: 'file_name,client_id' })
       .select()
 
-    if (!error) added++
+    if (!error) {
+      added++
+      // Auto-update delivered count for this client: baseline + asset count for current month
+      await refreshDeliveredCount(supabase, clientId)
+    }
   }
 
   // Log the pull

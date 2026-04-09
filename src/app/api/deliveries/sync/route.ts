@@ -7,15 +7,15 @@ const supabase = createClient(
 )
 
 // POST /api/deliveries/sync
-// Counts assets in the assets table for the given month (defaults to current month)
-// and upserts monthly_deliveries.delivered for each client.
-// Assets are counted by date_added falling within the month.
+// Counts assets with date_added in the given month, then sets:
+//   delivered = baseline_delivered + asset_count
+// This preserves any manual baseline numbers and stacks new assets on top.
+// Defaults to current month if year/month not provided.
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
 
-    // Default to current month if not specified
-    const now = new Date()
+    const now   = new Date()
     const year  = body.year  ?? now.getFullYear()
     const month = body.month ?? now.getMonth() + 1  // 1-indexed
 
@@ -27,60 +27,61 @@ export async function POST(req: Request) {
     // Count assets per client within the month
     const { data: assets, error: assetsErr } = await supabase
       .from('assets')
-      .select('client_id, id')
+      .select('client_id')
       .gte('date_added', monthStart)
       .lt('date_added', nextMonth)
 
     if (assetsErr) throw assetsErr
 
-    // Tally by client
-    const counts: Record<string, number> = {}
+    const assetCounts: Record<string, number> = {}
     for (const asset of assets ?? []) {
-      counts[asset.client_id] = (counts[asset.client_id] ?? 0) + 1
+      assetCounts[asset.client_id] = (assetCounts[asset.client_id] ?? 0) + 1
     }
 
-    if (Object.keys(counts).length === 0) {
-      return NextResponse.json({
-        synced: [],
-        message: `No assets found for ${monthStart.slice(0, 7)}`,
-      })
-    }
-
-    // Fetch current quota values so we don't overwrite them
-    const clientIds = Object.keys(counts)
+    // Fetch existing delivery rows for this month (all clients, not just ones with assets)
     const { data: existing, error: existErr } = await supabase
       .from('monthly_deliveries')
-      .select('id, client_id, quota')
+      .select('id, client_id, quota, baseline_delivered')
       .eq('month', monthStart)
-      .in('client_id', clientIds)
 
     if (existErr) throw existErr
 
-    const quotaMap: Record<string, number> = {}
-    for (const row of existing ?? []) {
-      quotaMap[row.client_id] = row.quota
+    if (!existing || existing.length === 0) {
+      return NextResponse.json({
+        synced: [],
+        message: `No delivery rows found for ${monthStart.slice(0, 7)} — add clients first via Admin.`,
+      })
     }
 
-    // Upsert one row per client — update delivered, keep existing quota (default 30)
-    const upserts = clientIds.map(clientId => ({
-      client_id:  clientId,
-      month:      monthStart,
-      delivered:  counts[clientId],
-      quota:      quotaMap[clientId] ?? 30,
+    // Update each existing row: delivered = baseline + asset count for that client
+    const updates = existing.map(row => ({
+      id:                 row.id,
+      client_id:          row.client_id,
+      month:              monthStart,
+      quota:              row.quota,
+      baseline_delivered: row.baseline_delivered,
+      delivered:          row.baseline_delivered + (assetCounts[row.client_id] ?? 0),
     }))
 
     const { data: upserted, error: upsertErr } = await supabase
       .from('monthly_deliveries')
-      .upsert(upserts, { onConflict: 'client_id,month' })
+      .upsert(updates, { onConflict: 'client_id,month' })
       .select()
 
     if (upsertErr) throw upsertErr
 
+    const summary = updates.map(u => ({
+      client_id: u.client_id,
+      baseline:  u.baseline_delivered,
+      new_assets: assetCounts[u.client_id] ?? 0,
+      total:     u.delivered,
+    }))
+
     return NextResponse.json({
       synced: upserted,
-      counts,
+      summary,
       month: monthStart.slice(0, 7),
-      message: `Synced ${upserts.length} client(s) for ${monthStart.slice(0, 7)}`,
+      message: `Synced ${updates.length} client(s) for ${monthStart.slice(0, 7)}`,
     })
   } catch (err: unknown) {
     console.error('Sync deliveries error:', err)
