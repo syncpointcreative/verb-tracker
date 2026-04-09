@@ -123,8 +123,8 @@ export default async function ClientPage({ params }: Props) {
         )}
       </div>
 
-      {/* Asset tables by stage — interactive (notes editable, freshness meter) */}
-      <AssetTable assets={allAssets} />
+      {/* Asset tables by stage — interactive (edit mode, freshness meter) */}
+      <AssetTable assets={allAssets} products={allProducts} />
 
       {/* Missing Coverage */}
       {missingCoverage.length > 0 && (
