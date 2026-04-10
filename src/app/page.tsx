@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { STAGE_CONFIG, STAGES, STATUS_CONFIG, TARGET_ASSETS_PER_STAGE, EXPIRY_DAYS } from '@/lib/constants'
-import type { Client, Asset, Stage } from '@/lib/supabase'
+import type { Client, Asset } from '@/lib/supabase'
 
 interface MonthlyDelivery {
   client_id: string
@@ -10,13 +9,38 @@ interface MonthlyDelivery {
   quota: number
 }
 
+interface FreshnessCounts {
+  fresh: number
+  monitor: number
+  refreshSoon: number
+  stale: number
+  expired: number
+}
+
 interface ClientSummary {
   client: Client
-  stageCounts: Record<Stage, { active: number; total: number }>
-  onTarget: boolean
-  totalActive: number
   totalAssets: number
+  freshness: FreshnessCounts
+  contentTypeCounts: Record<string, number>
   deliveries: MonthlyDelivery[]
+}
+
+const FRESHNESS_TIERS = [
+  { key: 'fresh',       maxDays: 14,       label: 'Fresh',        dot: 'bg-green-400',  text: 'text-green-700'  },
+  { key: 'monitor',     maxDays: 30,       label: 'Monitor',      dot: 'bg-yellow-400', text: 'text-yellow-700' },
+  { key: 'refreshSoon', maxDays: 60,       label: 'Refresh Soon', dot: 'bg-orange-400', text: 'text-orange-700' },
+  { key: 'stale',       maxDays: 90,       label: 'Stale',        dot: 'bg-red-400',    text: 'text-red-700'    },
+  { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-gray-400',   text: 'text-gray-500'   },
+] as const
+
+function getFreshnessTier(dateAdded: string | null): keyof FreshnessCounts {
+  if (!dateAdded) return 'expired'
+  const days = Math.floor((Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24))
+  if (days <= 14) return 'fresh'
+  if (days <= 30) return 'monitor'
+  if (days <= 60) return 'refreshSoon'
+  if (days <= 90) return 'stale'
+  return 'expired'
 }
 
 function getCurrentAndNextMonth() {
@@ -40,17 +64,13 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
 
   if (!clients?.length) return []
 
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS)
-
   const { current, next } = getCurrentAndNextMonth()
 
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
     supabase
       .from('assets')
-      .select('*')
-      .in('client_id', clients.map(c => c.id))
-      .neq('status', 'Needs Refresh / Missing'),
+      .select('client_id, date_added, content_type')
+      .in('client_id', clients.map(c => c.id)),
     supabase
       .from('monthly_deliveries')
       .select('*')
@@ -59,7 +79,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       .order('month'),
   ])
 
-  const assetsByClient: Record<string, Asset[]> = {}
+  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'content_type'>[]> = {}
   for (const asset of (assets ?? [])) {
     if (!assetsByClient[asset.client_id]) assetsByClient[asset.client_id] = []
     assetsByClient[asset.client_id].push(asset)
@@ -74,33 +94,23 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   return clients.map(client => {
     const clientAssets = assetsByClient[client.id] ?? []
 
-    const stageCounts: Record<Stage, { active: number; total: number }> = {
-      Awareness:     { active: 0, total: 0 },
-      Consideration: { active: 0, total: 0 },
-      Conversion:    { active: 0, total: 0 },
-    }
+    const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0 }
+    const contentTypeCounts: Record<string, number> = {}
 
     for (const asset of clientAssets) {
-      const stage = asset.stage as Stage
-      stageCounts[stage].total++
-      const isDateExpired = asset.date_added
-        ? new Date(asset.date_added) < cutoff
-        : false
-      if (!isDateExpired && asset.status !== 'Expired') {
-        stageCounts[stage].active++
+      const tier = getFreshnessTier(asset.date_added)
+      freshness[tier]++
+
+      if (asset.content_type) {
+        contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
       }
     }
 
-    const onTarget = STAGES.every(s => stageCounts[s].active >= TARGET_ASSETS_PER_STAGE)
-    const totalActive = STAGES.reduce((sum, s) => sum + stageCounts[s].active, 0)
-    const totalAssets = clientAssets.length
-
     return {
       client,
-      stageCounts,
-      onTarget,
-      totalActive,
-      totalAssets,
+      totalAssets: clientAssets.length,
+      freshness,
+      contentTypeCounts,
       deliveries: deliveriesByClient[client.id] ?? [],
     }
   })
@@ -112,26 +122,27 @@ export default async function DashboardPage() {
   const summaries = await getClientSummaries()
   const { current } = getCurrentAndNextMonth()
 
-  const onTargetCount = summaries.filter(s => s.onTarget).length
-  const attentionCount = summaries.length - onTargetCount
-
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Content Dashboard</h1>
-        <p className="text-gray-500 mt-1">
-          {onTargetCount} on target · {attentionCount} need attention · {TARGET_ASSETS_PER_STAGE} active assets per stage required
-        </p>
+        <p className="text-gray-500 mt-1">{summaries.length} active clients</p>
       </div>
 
       {/* Client cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {summaries.map(({ client, stageCounts, onTarget, totalActive, totalAssets, deliveries }) => {
-          // Find current and next month delivery records
+        {summaries.map(({ client, totalAssets, freshness, contentTypeCounts, deliveries }) => {
           const currentDelivery = deliveries.find(d => d.month.startsWith(current.slice(0, 7)))
           const nextDelivery    = deliveries.find(d => !d.month.startsWith(current.slice(0, 7)))
           const isMaxed = currentDelivery ? currentDelivery.delivered >= currentDelivery.quota : false
+
+          // Only show freshness tiers that have assets
+          const activeTiers = FRESHNESS_TIERS.filter(t => freshness[t.key] > 0)
+
+          // Sort content types by count descending
+          const sortedTypes = Object.entries(contentTypeCounts)
+            .sort((a, b) => b[1] - a[1])
 
           return (
             <Link
@@ -141,17 +152,14 @@ export default async function DashboardPage() {
             >
               {/* Card header */}
               <div
-                className="rounded-t-xl px-4 py-3 flex items-center justify-between"
+                className="rounded-t-xl px-4 py-3"
                 style={{ backgroundColor: client.color_hex + '18', borderBottom: `2px solid ${client.color_hex}` }}
               >
                 <span className="font-semibold text-gray-900">{client.name}</span>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${onTarget ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {onTarget ? '✓ On Target' : '⚠ Attention Needed'}
-                </span>
               </div>
 
               {/* Monthly delivery counter */}
-              {currentDelivery && (
+              {currentDelivery ? (
                 <div className={`px-4 pt-3 pb-2 border-b border-gray-100 ${isMaxed ? 'bg-green-50' : ''}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -174,58 +182,82 @@ export default async function DashboardPage() {
                     </p>
                   )}
                   {isMaxed && !nextDelivery && (
-                    <p className="text-xs text-green-600 mt-1">Monthly quota met — next pieces roll to {new Date(new Date(currentDelivery.month).getFullYear(), new Date(currentDelivery.month).getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short' })}</p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Quota met — next pieces roll to{' '}
+                      {new Date(new Date(currentDelivery.month).getFullYear(), new Date(currentDelivery.month).getMonth() + 1, 1)
+                        .toLocaleDateString('en-US', { month: 'short' })}
+                    </p>
                   )}
+                </div>
+              ) : null}
+
+              {/* Library health */}
+              <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Library</span>
+                  <span className="text-xs text-gray-400">{totalAssets} assets</span>
+                </div>
+                {activeTiers.length > 0 ? (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {activeTiers.map(tier => (
+                      <span key={tier.key} className={`flex items-center gap-1 text-xs font-medium ${tier.text}`}>
+                        <span className={`inline-block w-2 h-2 rounded-full ${tier.dot}`} />
+                        {freshness[tier.key]} {tier.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">No assets yet</span>
+                )}
+              </div>
+
+              {/* Content type coverage */}
+              {sortedTypes.length > 0 && (
+                <div className="px-4 pt-3 pb-3">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Coverage</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {sortedTypes.map(([type, count]) => (
+                      <span key={type} className="text-xs text-gray-600">
+                        {type} <span className="font-semibold text-gray-800">{count}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Stage breakdown */}
-              <div className="p-4 space-y-2">
-                {STAGES.map(stage => {
-                  const { active } = stageCounts[stage]
-                  const cfg = STAGE_CONFIG[stage]
-                  const met = active >= TARGET_ASSETS_PER_STAGE
-                  return (
-                    <div key={stage} className="flex items-center justify-between text-sm">
-                      <span className={`font-medium ${cfg.text}`}>{stage}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 bg-gray-100 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${met ? 'bg-green-500' : 'bg-amber-400'}`}
-                            style={{ width: `${Math.min(100, (active / TARGET_ASSETS_PER_STAGE) * 100)}%` }}
-                          />
-                        </div>
-                        <span className={`w-8 text-right ${met ? 'text-green-600' : 'text-amber-600'} font-medium`}>
-                          {active}/{TARGET_ASSETS_PER_STAGE}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
               {/* Footer */}
-              <div className="px-4 pb-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 pt-2">
-                <span>{totalActive} active of {totalAssets} total</span>
-                {client.drive_url && (
-                  <a href={client.drive_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+              {client.drive_url && (
+                <div className="px-4 pb-3 border-t border-gray-100 pt-2 flex justify-end">
+                  <a
+                    href={client.drive_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="text-xs text-blue-500 hover:underline"
+                  >
                     Drive ↗
                   </a>
-                )}
-              </div>
+                </div>
+              )}
             </Link>
           )
         })}
       </div>
 
-      {/* Status legend */}
+      {/* Freshness legend */}
       <div className="mt-10 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Status Key</h2>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Freshness Key</h2>
         <div className="flex flex-wrap gap-3">
-          {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
-            <div key={status} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
-              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-              {status}
+          {FRESHNESS_TIERS.map(tier => (
+            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 ${tier.text}`}>
+              <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
+              {tier.label} — {
+                tier.key === 'fresh'       ? '0–14 days' :
+                tier.key === 'monitor'     ? '15–30 days' :
+                tier.key === 'refreshSoon' ? '31–60 days' :
+                tier.key === 'stale'       ? '61–90 days' :
+                '90+ days'
+              }
             </div>
           ))}
         </div>
