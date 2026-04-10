@@ -145,11 +145,11 @@ export default async function DashboardPage() {
             .sort((a, b) => b[1] - a[1])
 
           return (
-            <Link
+            <div
               key={client.id}
-              href={`/${client.slug}`}
-              className="block bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
+              className="relative bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
             >
+              <Link href={`/${client.slug}`} className="block">
               {/* Card header */}
               <div
                 className="rounded-t-xl px-4 py-3"
@@ -225,21 +225,24 @@ export default async function DashboardPage() {
                 </div>
               )}
 
-              {/* Footer */}
+              {/* Spacer so Drive link doesn't overlap content */}
+              {client.drive_url && <div className="pb-8" />}
+              </Link>
+
+              {/* Drive link — outside <Link> to avoid nested <a> tags */}
               {client.drive_url && (
-                <div className="px-4 pb-3 border-t border-gray-100 pt-2 flex justify-end">
+                <div className="absolute bottom-3 right-4">
                   <a
                     href={client.drive_url}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={e => e.stopPropagation()}
                     className="text-xs text-blue-500 hover:underline"
                   >
                     Drive ↗
                   </a>
                 </div>
               )}
-            </Link>
+            </div>
           )
         })}
       </div>
