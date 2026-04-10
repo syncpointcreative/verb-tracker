@@ -163,6 +163,7 @@ const CREATOR_CODES = [
   { code: 'AO', name: 'Anthony Oshea' },
   { code: 'BG', name: 'Brielle Galekovic' },
   { code: 'MX', name: 'Max Gomas' },
+  { code: 'ID', name: 'Isabella Donoso' },
 ]
 
 export default function HowToUsePage() {
