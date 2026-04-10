@@ -8,11 +8,27 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'VERB — Content Tracker',
   description: 'TikTok content asset tracker for SyncPoint Creative',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'VERB',
+  },
+  themeColor: '#111827',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body className={`${inter.className} bg-gray-50 min-h-screen`}>
         {/* Top nav */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">

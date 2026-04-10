@@ -70,7 +70,7 @@ export const PRODUCT_CODES: Record<string, string> = {
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',
   CRL: 'Creator-Led', TREV: 'Testimonial / Review',
-  TUT: 'Tutorial / How-To', TRD: 'Trend-Led', PROMO: 'Promotional',
+  TUT: 'Tutorial / How-To', PROMO: 'Promotional',
   SI: 'Static Imagery', MG: 'Motion Graphics', AFF: 'Affiliate Video',
 }
 export const CREATOR_CODES: Record<string, string> = {

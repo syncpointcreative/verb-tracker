@@ -492,7 +492,7 @@ export default function AdminPage() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select…</option>
-                {['UGC','Brand / Lifestyle','Product Demo','Creator-Led','Testimonial / Review','Tutorial / How-To','Trend-Led','Promotional','Static Imagery','Motion Graphics','Affiliate Video'].map(t => (
+                {['UGC','Brand / Lifestyle','Product Demo','Creator-Led','Testimonial / Review','Tutorial / How-To','Promotional','Static Imagery','Motion Graphics','Affiliate Video'].map(t => (
                   <option key={t}>{t}</option>
                 ))}
               </select>

@@ -84,7 +84,7 @@ function fmt(dateStr: string | null) {
 
 const CONTENT_TYPES = [
   'UGC', 'Brand / Lifestyle', 'Product Demo', 'Creator-Led',
-  'Testimonial / Review', 'Tutorial / How-To', 'Trend-Led', 'Promotional',
+  'Testimonial / Review', 'Tutorial / How-To', 'Promotional',
   'Static Imagery', 'Motion Graphics', 'Affiliate Video',
 ]
 
