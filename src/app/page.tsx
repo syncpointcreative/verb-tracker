@@ -35,7 +35,7 @@ const FRESHNESS_TIERS = [
 
 function getFreshnessTier(dateAdded: string | null): keyof FreshnessCounts {
   if (!dateAdded) return 'expired'
-  const days = Math.floor((Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24))
+  const days = Math.floor((Date.now() - new Date(dateAdded + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
   if (days <= 14) return 'fresh'
   if (days <= 30) return 'monitor'
   if (days <= 60) return 'refreshSoon'

@@ -26,7 +26,7 @@ const FRESHNESS = [
 
 function FreshnessMeter({ dateStr }: { dateStr: string | null }) {
   if (!dateStr) return <span className="text-gray-300 text-xs">—</span>
-  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000)
+  const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000)
   const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[4]
   const pct  = Math.min(100, Math.round((days / 90) * 100))
   return (
@@ -79,7 +79,8 @@ function NotesCell({ value, assetId }: { value: string | null; assetId: string }
 
 function fmt(dateStr: string | null) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+  // Append T12:00:00 to avoid UTC-midnight → local-yesterday timezone shift
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
 }
 
 const CONTENT_TYPES = [
