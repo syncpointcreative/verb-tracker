@@ -146,7 +146,6 @@ const TYPE_CODES = [
   { code: 'CRL',   name: 'Creator-Led' },
   { code: 'TREV',  name: 'Testimonial / Review' },
   { code: 'TUT',   name: 'Tutorial / How-To' },
-  { code: 'TRD',   name: 'Trend-Led' },
   { code: 'PROMO', name: 'Promotional' },
   { code: 'SI',    name: 'Static Imagery' },
   { code: 'MG',    name: 'Motion Graphics' },
