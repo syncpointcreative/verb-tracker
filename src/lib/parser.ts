@@ -85,12 +85,15 @@ function toTitleCase(slug: string): string {
 
 function parseDateCode(code: string | undefined): Date | null {
   if (!code || code.length < 6) return null
-  // MMDDYY
+  // Handle both MMDDYY (6 digits) and MMDDYYYY (8 digits)
   const mm = parseInt(code.slice(0, 2))
   const dd = parseInt(code.slice(2, 4))
-  const yy = parseInt(code.slice(4, 6))
+  const yearStr = code.slice(4)
+  const yy = yearStr.length === 4
+    ? parseInt(yearStr)          // full 4-digit year: 2026
+    : 2000 + parseInt(yearStr)  // 2-digit year: 26 → 2026
   if (isNaN(mm) || isNaN(dd) || isNaN(yy)) return null
-  return new Date(2000 + yy, mm - 1, dd)
+  return new Date(yy, mm - 1, dd)
 }
 
 function extractDateFromFilename(base: string): Date | null {

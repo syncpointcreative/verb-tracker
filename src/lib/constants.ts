@@ -49,9 +49,10 @@ export const SLACK_CHANNEL_ID = 'C0843S6QRA8'
 // Naming convention parser maps
 export const CLIENT_CODES: Record<string, string> = {
   BIOM: 'Biom', CHOMPS: 'Chomps', HIMA: 'Himapure',
-  HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub',
+  HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
 }
 export const PRODUCT_CODES: Record<string, string> = {
+  FT: 'FaceTub',
   APW: 'All Purpose Wipes', DW: 'Disinfecting Wipes',
   BW: 'Baby Wipes', FW: 'Flushable Wipes',
   OBB: 'Original Beef', SMK: 'Smokey BBQ Beef',
@@ -76,4 +77,6 @@ export const TYPE_CODES: Record<string, string> = {
 export const CREATOR_CODES: Record<string, string> = {
   DB: 'David Butler', MA: 'Mitchell Allen', MP: 'Mia Pistilli',
   DY: 'Dylan Nelson', JM: 'Jayden Mejia', LR: 'Libby Ragole',
+  BS: 'Becca Seifert', AO: 'Anthony Oshea', BG: 'Brielle Galekovic',
+  MX: 'Max Gomas',
 }

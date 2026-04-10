@@ -132,7 +132,7 @@ const PRODUCT_CODES_BY_CLIENT: {
     ],
   },
   {
-    client: 'FaceTub', code: 'FTUB',
+    client: 'FaceTub', code: 'FT',
     products: [
       { code: 'FT', name: 'FaceTub' },
     ],
@@ -159,6 +159,10 @@ const CREATOR_CODES = [
   { code: 'DY', name: 'Dylan Nelson' },
   { code: 'JM', name: 'Jayden Mejia' },
   { code: 'LR', name: 'Libby Ragole' },
+  { code: 'BS', name: 'Becca Seifert' },
+  { code: 'AO', name: 'Anthony Oshea' },
+  { code: 'BG', name: 'Brielle Galekovic' },
+  { code: 'MX', name: 'Max Gomas' },
 ]
 
 export default function HowToUsePage() {
