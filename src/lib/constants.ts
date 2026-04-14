@@ -66,7 +66,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   PC: 'Pineapple Coconut', SC: 'Salted Caramel',
   CPB: 'Chocolate Peanut Butter', CC: 'Cookies & Cream',
   MC: 'Mint Chocolate', EP: 'Electrolyte Packs',
-  FVP: 'Variety Pack', AF: 'Any Flavor',
+  FVP: 'Variety Pack', AF: 'Any Flavor', AT: 'Any Tea',
 }
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',

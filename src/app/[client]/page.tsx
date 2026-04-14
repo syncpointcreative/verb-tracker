@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { STAGE_CONFIG, STAGES, TARGET_ASSETS_PER_STAGE, EXPIRY_DAYS } from '@/lib/constants'
-import type { Asset, Product, Stage } from '@/lib/supabase'
+import { STAGES, STAGE_CONFIG, EXPIRY_DAYS } from '@/lib/constants'
+
+// STAGES and STAGE_CONFIG are used in the missing coverage section below
+import type { Asset, Product } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 
 
@@ -72,16 +74,6 @@ export default async function ClientPage({ params }: Props) {
     }
   }
 
-  // Stage active counts
-  const activeCounts: Record<Stage, number> = { Awareness: 0, Consideration: 0, Conversion: 0 }
-  for (const asset of allAssets) {
-    if (asset.status !== 'Needs Refresh / Missing' && asset.status !== 'Expired') {
-      if (!asset.date_added || new Date(asset.date_added) >= cutoff) {
-        activeCounts[asset.stage as Stage]++
-      }
-    }
-  }
-
   return (
     <div>
       {/* Breadcrumb */}
@@ -95,18 +87,6 @@ export default async function ClientPage({ params }: Props) {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
-          <div className="flex gap-4 mt-2">
-            {STAGES.map(stage => {
-              const count = activeCounts[stage]
-              const met = count >= TARGET_ASSETS_PER_STAGE
-              const cfg = STAGE_CONFIG[stage]
-              return (
-                <span key={stage} className={`text-sm font-medium px-2.5 py-0.5 rounded-full ${met ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {cfg.label}: {count}/{TARGET_ASSETS_PER_STAGE}
-                </span>
-              )
-            })}
-          </div>
         </div>
         {client.drive_url && (
           <a

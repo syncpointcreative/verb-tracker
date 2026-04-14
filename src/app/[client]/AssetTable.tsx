@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { STAGE_CONFIG, STAGES, STATUS_CONFIG } from '@/lib/constants'
 import type { Asset, Product, Stage } from '@/lib/supabase'
 
+const TARGET_PER_STAGE = 6  // TikTok optimizes at 6 assets per campaign
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ClientProduct { id: string; name: string; sort_order: number }
@@ -97,18 +99,24 @@ interface Props {
 }
 
 export default function AssetTable({ assets, products }: Props) {
-  const [editMode, setEditMode]       = useState(false)
-  const [pending, setPending]         = useState<Record<string, PendingChange>>({})
-  const [saving, setSaving]           = useState(false)
-  const [savedMsg, setSavedMsg]       = useState(false)
+  const [editMode, setEditMode]           = useState(false)
+  const [pending, setPending]             = useState<Record<string, PendingChange>>({})
+  const [saving, setSaving]               = useState(false)
+  const [savedMsg, setSavedMsg]           = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
 
   // Track local display state after saves so UI stays fresh without a full reload
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
 
+  // Filter assets by selected product (null = all)
+  const filteredAssets = selectedProductId
+    ? localAssets.filter(a => a.product_id === selectedProductId)
+    : localAssets
+
   const byStage: Record<Stage, Asset[]> = {
-    Awareness:     localAssets.filter(a => a.stage === 'Awareness'),
-    Consideration: localAssets.filter(a => a.stage === 'Consideration'),
-    Conversion:    localAssets.filter(a => a.stage === 'Conversion'),
+    Awareness:     filteredAssets.filter(a => a.stage === 'Awareness'),
+    Consideration: filteredAssets.filter(a => a.stage === 'Consideration'),
+    Conversion:    filteredAssets.filter(a => a.stage === 'Conversion'),
   }
 
   const setPendingField = (id: string, field: keyof PendingChange, value: string | null) => {
@@ -155,36 +163,83 @@ export default function AssetTable({ assets, products }: Props) {
 
   return (
     <div>
-      {/* Edit / Save / Cancel controls */}
-      <div className="flex items-center justify-end gap-2 mb-4">
-        {savedMsg && (
-          <span className="text-xs text-green-600 font-medium">Saved ✓</span>
-        )}
-        {editMode ? (
-          <>
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-lg disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : `Save Changes${Object.keys(pending).length ? ` (${Object.keys(pending).length})` : ''}`}
-            </button>
-          </>
-        ) : (
+      {/* Product filter pills */}
+      {products.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
-            onClick={() => setEditMode(true)}
-            className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50"
+            onClick={() => setSelectedProductId(null)}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+              selectedProductId === null
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
-            ✎ Edit
+            All
           </button>
-        )}
+          {products.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setSelectedProductId(p.id === selectedProductId ? null : p.id)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                selectedProductId === p.id
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Stage counts + Edit controls */}
+      <div className="flex items-center justify-between mb-4">
+        {/* Stage counts — react to product filter */}
+        <div className="flex gap-3">
+          {STAGES.map(stage => {
+            const count = byStage[stage].length
+            const met   = count >= TARGET_PER_STAGE
+            const cfg   = STAGE_CONFIG[stage]
+            return (
+              <span
+                key={stage}
+                className={`text-xs font-semibold px-2.5 py-1 rounded-full ${met ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+              >
+                <span className={`${cfg.text} mr-1`}>{cfg.label}:</span>{count}/{TARGET_PER_STAGE}
+              </span>
+            )
+          })}
+        </div>
+
+        {/* Edit / Save / Cancel */}
+        <div className="flex items-center gap-2">
+          {savedMsg && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
+          {editMode ? (
+            <>
+              <button
+                onClick={handleCancel}
+                disabled={saving}
+                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : `Save Changes${Object.keys(pending).length ? ` (${Object.keys(pending).length})` : ''}`}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setEditMode(true)}
+              className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50"
+            >
+              ✎ Edit
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stage tables */}
