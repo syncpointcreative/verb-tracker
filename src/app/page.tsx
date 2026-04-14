@@ -54,6 +54,36 @@ function formatMonth(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
+interface LeaderboardEntry {
+  name: string
+  count: number
+}
+
+async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const supabase = createServerClient()
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+
+  const { data: assets } = await supabase
+    .from('assets')
+    .select('posted_by')
+    .gte('date_added', monthStart)
+    .lt('date_added', monthEnd)
+    .not('posted_by', 'is', null)
+
+  const counts: Record<string, number> = {}
+  for (const asset of (assets ?? [])) {
+    if (asset.posted_by) {
+      counts[asset.posted_by] = (counts[asset.posted_by] ?? 0) + 1
+    }
+  }
+
+  return Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
 async function getClientSummaries(): Promise<ClientSummary[]> {
   const supabase = createServerClient()
 
@@ -119,8 +149,9 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
 export const revalidate = 60
 
 export default async function DashboardPage() {
-  const summaries = await getClientSummaries()
+  const [summaries, leaderboard] = await Promise.all([getClientSummaries(), getLeaderboard()])
   const { current } = getCurrentAndNextMonth()
+  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   return (
     <div>
@@ -129,6 +160,37 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Content Dashboard</h1>
         <p className="text-gray-500 mt-1">{summaries.length} active clients</p>
       </div>
+
+      {/* Creator Leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="mb-8 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-gradient-to-r from-gray-900 to-gray-700 px-5 py-3 flex items-center justify-between">
+            <span className="text-white font-bold text-base">🏆 {monthLabel} Leaderboard</span>
+            <span className="text-gray-400 text-xs uppercase tracking-wider">Assets This Month</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {leaderboard.map((entry, i) => {
+              const pct   = Math.round((entry.count / leaderboard[0].count) * 100)
+              const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+              const barColor = i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-blue-300'
+              return (
+                <div key={entry.name} className={`flex items-center gap-4 px-5 py-3 ${i === 0 ? 'bg-yellow-50' : ''}`}>
+                  <span className="text-xl w-8 text-center flex-shrink-0">
+                    {medal ?? <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
+                  </span>
+                  <span className="font-medium text-gray-900 w-44 flex-shrink-0 truncate">{entry.name}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={`text-lg font-bold w-8 text-right flex-shrink-0 ${i === 0 ? 'text-yellow-600' : 'text-gray-700'}`}>
+                    {entry.count}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Client cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
