@@ -160,11 +160,13 @@ const CREATOR_CODES = [
   { code: 'DY', name: 'Dylan Nelson' },
   { code: 'JM', name: 'Jayden Mejia' },
   { code: 'LR', name: 'Libby Ragole' },
-  { code: 'BS', name: 'Becca Seifert' },
+  { code: 'BS', name: 'Becca Siefert' },
   { code: 'AO', name: 'Anthony Oshea' },
   { code: 'BG', name: 'Brielle Galekovic' },
   { code: 'MX', name: 'Max Gomas' },
   { code: 'ID', name: 'Isabella Donoso' },
+  { code: 'SB', name: 'Seth Baron' },
+  { code: 'LS', name: 'Liz Snyder' },
 ]
 
 export default function HowToUsePage() {
