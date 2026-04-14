@@ -129,6 +129,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'EP',  name: 'Electrolyte Packs' },
       { code: 'FVP', name: 'Variety Pack' },
       { code: 'AF',  name: 'Any Flavor' },
+      { code: 'AT',  name: 'Any Tea' },
     ],
   },
   {
