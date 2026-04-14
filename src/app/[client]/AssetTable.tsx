@@ -4,8 +4,6 @@ import { useState, useRef } from 'react'
 import { STAGE_CONFIG, STAGES, STATUS_CONFIG } from '@/lib/constants'
 import type { Asset, Product, Stage } from '@/lib/supabase'
 
-const TARGET_PER_STAGE = 6  // TikTok optimizes at 6 assets per campaign
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ClientProduct { id: string; name: string; sort_order: number }
@@ -163,52 +161,22 @@ export default function AssetTable({ assets, products }: Props) {
 
   return (
     <div>
-      {/* Product filter pills */}
-      {products.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setSelectedProductId(null)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-              selectedProductId === null
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            All
-          </button>
-          {products.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setSelectedProductId(p.id === selectedProductId ? null : p.id)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                selectedProductId === p.id
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Stage counts + Edit controls */}
+      {/* Product filter dropdown + Edit controls */}
       <div className="flex items-center justify-between mb-4">
-        {/* Stage counts — react to product filter */}
-        <div className="flex gap-3">
-          {STAGES.map(stage => {
-            const count = byStage[stage].length
-            const met   = count >= TARGET_PER_STAGE
-            const cfg   = STAGE_CONFIG[stage]
-            return (
-              <span
-                key={stage}
-                className={`text-xs font-semibold px-2.5 py-1 rounded-full ${met ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-              >
-                <span className={`${cfg.text} mr-1`}>{cfg.label}:</span>{count}/{TARGET_PER_STAGE}
-              </span>
-            )
-          })}
+        {/* Product dropdown — only show if multiple products */}
+        <div>
+          {products.length > 1 && (
+            <select
+              value={selectedProductId ?? ''}
+              onChange={e => setSelectedProductId(e.target.value || null)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="">All Products</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Edit / Save / Cancel */}
