@@ -4,7 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { STAGES, STAGE_CONFIG, EXPIRY_DAYS } from '@/lib/constants'
 
 // STAGES and STAGE_CONFIG are used in the missing coverage section below
-import type { Asset, Product } from '@/lib/supabase'
+import type { Asset, Product, Stage } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 
 
