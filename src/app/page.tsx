@@ -278,6 +278,25 @@ export default async function DashboardPage() {
         })}
       </div>
 
+      {/* Freshness legend */}
+      <div className="mt-10 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Freshness Key</h2>
+        <div className="flex flex-wrap gap-3">
+          {FRESHNESS_TIERS.map(tier => (
+            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 ${tier.text}`}>
+              <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
+              {tier.label} — {
+                tier.key === 'fresh'       ? '0–14 days' :
+                tier.key === 'monitor'     ? '15–30 days' :
+                tier.key === 'refreshSoon' ? '31–60 days' :
+                tier.key === 'stale'       ? '61–90 days' :
+                '90+ days'
+              }
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Creator Leaderboard */}
       {leaderboard.length > 0 && (
         <div className="mt-8 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -309,24 +328,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Freshness legend */}
-      <div className="mt-10 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Freshness Key</h2>
-        <div className="flex flex-wrap gap-3">
-          {FRESHNESS_TIERS.map(tier => (
-            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 ${tier.text}`}>
-              <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
-              {tier.label} — {
-                tier.key === 'fresh'       ? '0–14 days' :
-                tier.key === 'monitor'     ? '15–30 days' :
-                tier.key === 'refreshSoon' ? '31–60 days' :
-                tier.key === 'stale'       ? '61–90 days' :
-                '90+ days'
-              }
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
