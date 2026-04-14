@@ -161,37 +161,6 @@ export default async function DashboardPage() {
         <p className="text-gray-500 mt-1">{summaries.length} active clients</p>
       </div>
 
-      {/* Creator Leaderboard */}
-      {leaderboard.length > 0 && (
-        <div className="mb-8 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-gray-900 to-gray-700 px-5 py-3 flex items-center justify-between">
-            <span className="text-white font-bold text-base">🏆 {monthLabel} Leaderboard</span>
-            <span className="text-gray-400 text-xs uppercase tracking-wider">Assets This Month</span>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {leaderboard.map((entry, i) => {
-              const pct   = Math.round((entry.count / leaderboard[0].count) * 100)
-              const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
-              const barColor = i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-blue-300'
-              return (
-                <div key={entry.name} className={`flex items-center gap-4 px-5 py-3 ${i === 0 ? 'bg-yellow-50' : ''}`}>
-                  <span className="text-xl w-8 text-center flex-shrink-0">
-                    {medal ?? <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
-                  </span>
-                  <span className="font-medium text-gray-900 w-44 flex-shrink-0 truncate">{entry.name}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className={`text-lg font-bold w-8 text-right flex-shrink-0 ${i === 0 ? 'text-yellow-600' : 'text-gray-700'}`}>
-                    {entry.count}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Client cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {summaries.map(({ client, totalAssets, freshness, contentTypeCounts, deliveries }) => {
@@ -308,6 +277,37 @@ export default async function DashboardPage() {
           )
         })}
       </div>
+
+      {/* Creator Leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="mt-8 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-gradient-to-r from-gray-900 to-gray-700 px-5 py-3 flex items-center justify-between">
+            <span className="text-white font-bold text-base">🏆 {monthLabel} Leaderboard</span>
+            <span className="text-gray-400 text-xs uppercase tracking-wider">Assets This Month</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {leaderboard.map((entry, i) => {
+              const pct      = Math.round((entry.count / leaderboard[0].count) * 100)
+              const medal    = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+              const barColor = i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-blue-300'
+              return (
+                <div key={entry.name} className={`flex items-center gap-4 px-5 py-3 ${i === 0 ? 'bg-yellow-50' : ''}`}>
+                  <span className="text-xl w-8 text-center flex-shrink-0">
+                    {medal ?? <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
+                  </span>
+                  <span className="font-medium text-gray-900 w-44 flex-shrink-0 truncate">{entry.name}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={`text-lg font-bold w-8 text-right flex-shrink-0 ${i === 0 ? 'text-yellow-600' : 'text-gray-700'}`}>
+                    {entry.count}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Freshness legend */}
       <div className="mt-10 border-t border-gray-200 pt-6">
