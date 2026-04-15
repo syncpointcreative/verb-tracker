@@ -74,9 +74,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }) // ignore other channels
   }
 
+  // Skip thread replies — only process original top-level posts
+  const slackTs       = event.ts as string | undefined
+  const slackThreadTs = event.thread_ts as string | undefined
+  if (slackThreadTs && slackThreadTs !== slackTs) {
+    return NextResponse.json({ ok: true }) // reply in a thread — ignore
+  }
+
   // Collect file names from the event
   const fileNames: string[] = []
-  const slackTs = event.ts as string | undefined
 
   if (event.type === 'message' && event.files) {
     for (const f of event.files as Array<{ name?: string }>) {
