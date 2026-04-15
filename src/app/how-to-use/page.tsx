@@ -157,7 +157,7 @@ const CREATOR_CODES = [
   { code: 'DB', name: 'David Butler' },
   { code: 'MA', name: 'Mitchell Allen' },
   { code: 'MP', name: 'Mia Pistilli' },
-  { code: 'DY', name: 'Dylan Nelson' },
+  { code: 'DN', name: 'Dylan Nelson' },
   { code: 'JM', name: 'Jayden Mejia' },
   { code: 'LR', name: 'Libby Ragole' },
   { code: 'BS', name: 'Becca Siefert' },
