@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { CREATOR_CODES } from '@/lib/constants'
+
+const CREATORS = Object.entries(CREATOR_CODES).map(([, name]) => name).sort()
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -521,13 +524,16 @@ export default function AdminPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Posted By</label>
-              <input
-                type="text"
+              <select
                 value={form.posted_by}
                 onChange={e => setForm(f => ({ ...f, posted_by: e.target.value }))}
-                placeholder="Creator name"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">— Select creator —</option>
+                {CREATORS.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
