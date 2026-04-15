@@ -78,5 +78,5 @@ export const CREATOR_CODES: Record<string, string> = {
   DB: 'David Butler', MA: 'Mitchell Allen', MP: 'Mia Pistilli',
   DY: 'Dylan Nelson', JM: 'Jayden Mejia', LR: 'Libby Ragole',
   BS: 'Becca Siefert', AO: 'Anthony Oshea', BG: 'Brielle Galekovic',
-  MX: 'Max Gomas', ID: 'Isabella Donoso', SB: 'Seth Baron', LS: 'Liz Snyder',
+  MX: 'Max Gomas', ID: 'Isabella Donoso', SB: 'Seth Baron', LS: 'Liz Snyder', MD: 'Mike Dobson',
 }

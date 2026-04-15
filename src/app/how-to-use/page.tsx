@@ -167,6 +167,7 @@ const CREATOR_CODES = [
   { code: 'ID', name: 'Isabella Donoso' },
   { code: 'SB', name: 'Seth Baron' },
   { code: 'LS', name: 'Liz Snyder' },
+  { code: 'MD', name: 'Mike Dobson' },
 ]
 
 export default function HowToUsePage() {
