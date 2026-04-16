@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { STAGE_CONFIG, STAGES, STATUS_CONFIG } from '@/lib/constants'
 import type { Asset, Product, Stage } from '@/lib/supabase'
 
@@ -42,7 +42,7 @@ function FreshnessMeter({ dateStr }: { dateStr: string | null }) {
   )
 }
 
-// ─── Inline editable notes cell (always editable) ────────────────────────────
+// ─── Inline editable notes cell ───────────────────────────────────────────────
 
 function NotesCell({ value, assetId }: { value: string | null; assetId: string }) {
   const [local, setLocal]   = useState(value ?? '')
@@ -79,7 +79,6 @@ function NotesCell({ value, assetId }: { value: string | null; assetId: string }
 
 function fmt(dateStr: string | null) {
   if (!dateStr) return '—'
-  // Append T12:00:00 to avoid UTC-midnight → local-yesterday timezone shift
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
 }
 
@@ -89,27 +88,56 @@ const CONTENT_TYPES = [
   'Static Imagery', 'Motion Graphics', 'Affiliate Video',
 ]
 
+const ALL_STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing']
+
+const selectCls = "border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+const activeSelectCls = "border-blue-400 ring-1 ring-blue-300 rounded-lg px-2.5 py-1.5 text-sm text-blue-700 bg-blue-50 focus:outline-none"
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
   assets:   Asset[]
-  products: ClientProduct[]   // all products for this client, for the dropdown
+  products: ClientProduct[]
 }
 
 export default function AssetTable({ assets, products }: Props) {
-  const [editMode, setEditMode]           = useState(false)
-  const [pending, setPending]             = useState<Record<string, PendingChange>>({})
-  const [saving, setSaving]               = useState(false)
-  const [savedMsg, setSavedMsg]           = useState(false)
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [pending, setPending]   = useState<Record<string, PendingChange>>({})
+  const [saving, setSaving]     = useState(false)
+  const [savedMsg, setSavedMsg] = useState(false)
 
-  // Track local display state after saves so UI stays fresh without a full reload
+  // ── Filters & sort ──
+  const [selectedProductId,   setSelectedProductId]   = useState<string>('')
+  const [selectedCreator,     setSelectedCreator]     = useState<string>('')
+  const [selectedStatus,      setSelectedStatus]      = useState<string>('')
+  const [selectedContentType, setSelectedContentType] = useState<string>('')
+  const [dateSort, setDateSort] = useState<'desc' | 'asc'>('desc') // default: newest first
+
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
 
-  // Filter assets by selected product (null = all)
-  const filteredAssets = selectedProductId
-    ? localAssets.filter(a => a.product_id === selectedProductId)
-    : localAssets
+  // Derive unique creator options from actual data
+  const creatorOptions = useMemo(() =>
+    [...new Set(localAssets.map(a => a.posted_by).filter(Boolean) as string[])].sort()
+  , [localAssets])
+
+  // Derive unique content type options from actual data
+  const contentTypeOptions = useMemo(() =>
+    [...new Set(localAssets.map(a => a.content_type).filter(Boolean) as string[])].sort()
+  , [localAssets])
+
+  // Apply all filters then sort
+  const filteredAssets = useMemo(() => {
+    let result = localAssets
+    if (selectedProductId)   result = result.filter(a => a.product_id === selectedProductId)
+    if (selectedCreator)     result = result.filter(a => a.posted_by === selectedCreator)
+    if (selectedStatus)      result = result.filter(a => a.status === selectedStatus)
+    if (selectedContentType) result = result.filter(a => a.content_type === selectedContentType)
+    return [...result].sort((a, b) => {
+      const da = a.date_added ?? ''
+      const db = b.date_added ?? ''
+      return dateSort === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
+  }, [localAssets, selectedProductId, selectedCreator, selectedStatus, selectedContentType, dateSort])
 
   const byStage: Record<Stage, Asset[]> = {
     Awareness:     filteredAssets.filter(a => a.stage === 'Awareness'),
@@ -117,14 +145,19 @@ export default function AssetTable({ assets, products }: Props) {
     Conversion:    filteredAssets.filter(a => a.stage === 'Conversion'),
   }
 
+  const activeFilterCount = [selectedProductId, selectedCreator, selectedStatus, selectedContentType].filter(Boolean).length
+  const clearFilters = () => {
+    setSelectedProductId('')
+    setSelectedCreator('')
+    setSelectedStatus('')
+    setSelectedContentType('')
+  }
+
   const setPendingField = (id: string, field: keyof PendingChange, value: string | null) => {
     setPending(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
   }
 
-  const handleCancel = () => {
-    setPending({})
-    setEditMode(false)
-  }
+  const handleCancel = () => { setPending({}); setEditMode(false) }
 
   const handleSave = async () => {
     const entries = Object.entries(pending)
@@ -139,12 +172,10 @@ export default function AssetTable({ assets, products }: Props) {
       })
     ))
 
-    // Apply changes to local state so the table updates immediately
     setLocalAssets(prev => prev.map(a => {
       const change = pending[a.id]
       if (!change) return a
       const updated = { ...a, ...change }
-      // Update the product display object if product_id changed
       if (change.product_id) {
         const prod = products.find(p => p.id === change.product_id)
         if (prod) updated.product = prod as unknown as Product
@@ -161,26 +192,62 @@ export default function AssetTable({ assets, products }: Props) {
 
   return (
     <div>
-      {/* Product filter dropdown + Edit controls */}
-      <div className="flex items-center justify-between mb-4">
-        {/* Product dropdown — only show if multiple products */}
-        <div>
-          {products.length > 1 && (
-            <select
-              value={selectedProductId ?? ''}
-              onChange={e => setSelectedProductId(e.target.value || null)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              <option value="">All Products</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {/* Product */}
+        {products.length > 1 && (
+          <select
+            value={selectedProductId}
+            onChange={e => setSelectedProductId(e.target.value)}
+            className={selectedProductId ? activeSelectCls : selectCls}
+          >
+            <option value="">All Products</option>
+            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
 
-        {/* Edit / Save / Cancel */}
-        <div className="flex items-center gap-2">
+        {/* Creator */}
+        <select
+          value={selectedCreator}
+          onChange={e => setSelectedCreator(e.target.value)}
+          className={selectedCreator ? activeSelectCls : selectCls}
+        >
+          <option value="">All Creators</option>
+          {creatorOptions.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* Status */}
+        <select
+          value={selectedStatus}
+          onChange={e => setSelectedStatus(e.target.value)}
+          className={selectedStatus ? activeSelectCls : selectCls}
+        >
+          <option value="">All Statuses</option>
+          {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        {/* Content Type */}
+        <select
+          value={selectedContentType}
+          onChange={e => setSelectedContentType(e.target.value)}
+          className={selectedContentType ? activeSelectCls : selectCls}
+        >
+          <option value="">All Types</option>
+          {contentTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        {/* Clear filters */}
+        {activeFilterCount > 0 && (
+          <button
+            onClick={clearFilters}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+          </button>
+        )}
+
+        {/* Spacer + Edit controls */}
+        <div className="flex items-center gap-2 ml-auto">
           {savedMsg && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
           {editMode ? (
             <>
@@ -226,7 +293,7 @@ export default function AssetTable({ assets, products }: Props) {
 
             {stageAssets.length === 0 ? (
               <div className={`${cfg.lightBg} border border-t-0 ${cfg.border} rounded-b-lg px-4 py-6 text-center text-sm text-gray-500`}>
-                No assets yet — add via Slack or manually
+                {activeFilterCount > 0 ? 'No assets match the current filters' : 'No assets yet — add via Slack or manually'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -237,7 +304,16 @@ export default function AssetTable({ assets, products }: Props) {
                       <th className="text-left px-3 py-2">Asset Name</th>
                       <th className="text-left px-3 py-2 w-36">Content Type</th>
                       <th className="text-left px-3 py-2 w-24">Status</th>
-                      <th className="text-left px-3 py-2 w-24">Date</th>
+                      <th className="text-left px-3 py-2 w-24">
+                        <button
+                          onClick={() => setDateSort(d => d === 'desc' ? 'asc' : 'desc')}
+                          className="flex items-center gap-1 hover:text-gray-800 font-semibold uppercase tracking-wide"
+                          title="Toggle date sort"
+                        >
+                          Date
+                          <span className="text-gray-400">{dateSort === 'desc' ? '↓' : '↑'}</span>
+                        </button>
+                      </th>
                       <th className="text-left px-3 py-2 w-28">Posted By</th>
                       <th className="text-left px-3 py-2 w-24">Freshness</th>
                       <th className="text-left px-3 py-2">Notes</th>
@@ -261,9 +337,7 @@ export default function AssetTable({ assets, products }: Props) {
                                 onChange={e => setPendingField(asset.id, 'product_id', e.target.value)}
                                 className="w-full border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
                               >
-                                {products.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
+                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                             ) : (
                               <span className="text-gray-700 font-medium text-xs">
@@ -272,10 +346,8 @@ export default function AssetTable({ assets, products }: Props) {
                             )}
                           </td>
 
-                          {/* Asset Name (read-only on client page) */}
-                          <td className="px-3 py-2 text-gray-900 font-medium text-sm">
-                            {asset.asset_name}
-                          </td>
+                          {/* Asset Name */}
+                          <td className="px-3 py-2 text-gray-900 font-medium text-sm">{asset.asset_name}</td>
 
                           {/* Content Type */}
                           <td className="px-3 py-2">
@@ -293,7 +365,7 @@ export default function AssetTable({ assets, products }: Props) {
                             )}
                           </td>
 
-                          {/* Status (always read-only here — edit in Admin) */}
+                          {/* Status */}
                           <td className="px-3 py-2">
                             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusCfg.bg} ${statusCfg.text}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
@@ -320,14 +392,10 @@ export default function AssetTable({ assets, products }: Props) {
                           </td>
 
                           {/* Freshness */}
-                          <td className="px-3 py-2">
-                            <FreshnessMeter dateStr={asset.date_added} />
-                          </td>
+                          <td className="px-3 py-2"><FreshnessMeter dateStr={asset.date_added} /></td>
 
-                          {/* Notes (always editable) */}
-                          <td className="px-3 py-2">
-                            <NotesCell value={asset.notes} assetId={asset.id} />
-                          </td>
+                          {/* Notes */}
+                          <td className="px-3 py-2"><NotesCell value={asset.notes} assetId={asset.id} /></td>
                         </tr>
                       )
                     })}
