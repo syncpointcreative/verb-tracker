@@ -1,17 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { STAGES, STAGE_CONFIG, EXPIRY_DAYS } from '@/lib/constants'
-
-// STAGES and STAGE_CONFIG are used in the missing coverage section below
+import { STAGES, EXPIRY_DAYS } from '@/lib/constants'
 import type { Asset, Product, Stage } from '@/lib/supabase'
-import AssetTable from './AssetTable'
-
+import ClientTabs from './ClientTabs'
 
 interface Props {
   params: { client: string }
 }
-
 
 export const revalidate = 60
 
@@ -27,36 +23,26 @@ export default async function ClientPage({ params }: Props) {
 
   if (!client) notFound()
 
-  // Fetch products
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('client_id', client.id)
-    .order('sort_order')
-
-  // Fetch assets with product joined
-  const { data: assets } = await supabase
-    .from('assets')
-    .select('*, product:products(*)')
-    .eq('client_id', client.id)
-    .order('stage')
-    .order('date_added', { ascending: false })
+  // Fetch products, assets, and brief sections in parallel
+  const [
+    { data: products },
+    { data: assets },
+    { data: briefSectionsRaw },
+  ] = await Promise.all([
+    supabase.from('products').select('*').eq('client_id', client.id).order('sort_order'),
+    supabase.from('assets').select('*, product:products(*)').eq('client_id', client.id).order('stage').order('date_added', { ascending: false }),
+    supabase.from('brief_sections').select('id, title, content, sort_order').eq('client_id', client.id).order('sort_order'),
+  ])
 
   const allAssets: Asset[] = assets ?? []
   const allProducts: Product[] = products ?? []
+  const briefSections = briefSectionsRaw ?? []
 
-  // Group assets by stage
-  const byStage: Record<Stage, Asset[]> = {
-    Awareness:     allAssets.filter(a => a.stage === 'Awareness'),
-    Consideration: allAssets.filter(a => a.stage === 'Consideration'),
-    Conversion:    allAssets.filter(a => a.stage === 'Conversion'),
-  }
-
-  // Find missing product coverage: products that have 0 active assets in any stage
+  // Find missing product coverage
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS)
 
-  const coveredSet = new Set<string>() // productId-stage
+  const coveredSet = new Set<string>()
   for (const asset of allAssets) {
     if (asset.status !== 'Needs Refresh / Missing' && asset.status !== 'Expired') {
       if (!asset.date_added || new Date(asset.date_added) >= cutoff) {
@@ -103,46 +89,13 @@ export default async function ClientPage({ params }: Props) {
         )}
       </div>
 
-      {/* Asset tables by stage — interactive (edit mode, freshness meter) */}
-      <AssetTable assets={allAssets} products={allProducts} />
-
-      {/* Missing Coverage */}
-      {missingCoverage.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-amber-800 mb-3">⚠ Missing Coverage</h2>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-amber-100 border-b border-amber-200 text-xs text-amber-800 uppercase tracking-wide">
-                  <th className="text-left px-4 py-2">Product</th>
-                  <th className="text-left px-4 py-2">Missing Stage</th>
-                  <th className="text-left px-4 py-2">Suggested Ask</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-100">
-                {missingCoverage.map(({ product, stage }) => {
-                  const suggestions: Record<Stage, string> = {
-                    Awareness: 'Hook video — stop the scroll, introduce product',
-                    Consideration: 'Demo, tutorial, or testimonial showing value',
-                    Conversion: 'Promo/offer-led video with clear CTA',
-                  }
-                  return (
-                    <tr key={`${product.id}-${stage}`} className="hover:bg-amber-100/50">
-                      <td className="px-4 py-2 font-medium text-gray-800">{product.name}</td>
-                      <td className="px-4 py-2">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STAGE_CONFIG[stage].badge}`}>
-                          {stage}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-600 text-xs">{suggestions[stage]}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Tabbed content: Assets + Creator Brief */}
+      <ClientTabs
+        assets={allAssets}
+        products={allProducts}
+        briefSections={briefSections}
+        missingCoverage={missingCoverage}
+      />
     </div>
   )
 }
