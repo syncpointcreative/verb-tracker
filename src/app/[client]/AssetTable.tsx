@@ -17,22 +17,28 @@ interface PendingChange {
 // ─── Freshness meter ──────────────────────────────────────────────────────────
 
 const FRESHNESS = [
-  { maxDays: 14,       label: 'Fresh',        bar: 'bg-green-400',  text: 'text-green-700',  track: 'bg-green-100'  },
-  { maxDays: 30,       label: 'Monitor',      bar: 'bg-yellow-400', text: 'text-yellow-700', track: 'bg-yellow-100' },
-  { maxDays: 60,       label: 'Refresh Soon', bar: 'bg-orange-400', text: 'text-orange-700', track: 'bg-orange-100' },
-  { maxDays: 90,       label: 'Stale',        bar: 'bg-red-400',    text: 'text-red-700',    track: 'bg-red-100'    },
-  { maxDays: Infinity, label: 'Expired',      bar: 'bg-gray-400',   text: 'text-gray-500',   track: 'bg-gray-100'   },
+  { maxDays: 14,       label: 'Fresh',             emoji: null, bar: 'bg-green-400',  text: 'text-green-700',  track: 'bg-green-100'  },
+  { maxDays: 30,       label: 'Overripe',           emoji: null, bar: 'bg-yellow-400', text: 'text-yellow-700', track: 'bg-yellow-100' },
+  { maxDays: 60,       label: 'Consider Replacing', emoji: null, bar: 'bg-orange-400', text: 'text-orange-700', track: 'bg-orange-100' },
+  { maxDays: Infinity, label: 'Rotten',             emoji: '💩', bar: 'bg-red-400',    text: 'text-red-700',    track: 'bg-red-100'    },
 ]
 
-function FreshnessMeter({ dateStr }: { dateStr: string | null }) {
-  if (!dateStr) return <span className="text-gray-300 text-xs">—</span>
-  const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000)
-  const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[4]
-  const pct  = Math.min(100, Math.round((days / 90) * 100))
+function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
+  // Only count once the asset is live — show neutral state otherwise
+  if (status === 'Ready to Upload' || !dateLive) {
+    return <span className="text-gray-300 text-xs">Not live yet</span>
+  }
+
+  const days = Math.floor((Date.now() - new Date(dateLive + 'T12:00:00').getTime()) / 86_400_000)
+  const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[FRESHNESS.length - 1]
+  const pct  = Math.min(100, Math.round((days / 60) * 100)) // 60 days = full bar
+
   return (
-    <div className="flex flex-col gap-0.5 min-w-[80px]">
-      <div className="flex items-center justify-between">
-        <span className={`text-[10px] font-semibold ${tier.text}`}>{tier.label}</span>
+    <div className="flex flex-col gap-0.5 min-w-[90px]">
+      <div className="flex items-center justify-between gap-1">
+        <span className={`text-[10px] font-semibold ${tier.text}`}>
+          {tier.emoji && <span className="mr-0.5">{tier.emoji}</span>}{tier.label}
+        </span>
         <span className="text-[10px] text-gray-400">{days}d</span>
       </div>
       <div className={`h-1.5 rounded-full ${tier.track} overflow-hidden`}>
@@ -392,7 +398,7 @@ export default function AssetTable({ assets, products }: Props) {
                           </td>
 
                           {/* Freshness */}
-                          <td className="px-3 py-2"><FreshnessMeter dateStr={asset.date_added} /></td>
+                          <td className="px-3 py-2"><FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} /></td>
 
                           {/* Notes */}
                           <td className="px-3 py-2"><NotesCell value={asset.notes} assetId={asset.id} /></td>

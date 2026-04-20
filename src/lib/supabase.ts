@@ -28,6 +28,7 @@ export interface Asset {
   file_name: string | null
   status: AssetStatus
   date_added: string | null
+  date_live: string | null
   posted_by: string | null
   notes: string | null
   slack_message_ts: string | null
