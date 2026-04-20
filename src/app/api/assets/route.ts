@@ -94,7 +94,7 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   // Whitelist updatable fields
-  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'posted_by', 'notes', 'product_id']
+  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'posted_by', 'notes', 'product_id']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -109,6 +109,14 @@ export async function PATCH(req: NextRequest) {
   }
   if (updates.status && !VALID_STATUSES.has(updates.status as AssetStatus)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+  }
+
+  // Auto-stamp date_live when status first changes to "Live / Running"
+  if (updates.status === 'Live / Running' && !('date_live' in body)) {
+    const { data: existing } = await supabase.from('assets').select('date_live').eq('id', id).single()
+    if (!existing?.date_live) {
+      updates.date_live = new Date().toISOString().split('T')[0]
+    }
   }
 
   const { data, error } = await supabase

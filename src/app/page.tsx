@@ -33,9 +33,14 @@ const FRESHNESS_TIERS = [
   { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-gray-400',   text: 'text-gray-500'   },
 ] as const
 
-function getFreshnessTier(dateAdded: string | null): keyof FreshnessCounts {
-  if (!dateAdded) return 'expired'
-  const days = Math.floor((Date.now() - new Date(dateAdded + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
+function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts {
+  // Use date_live for live assets; fall back to date_added for non-live
+  const status   = asset.status ?? ''
+  const dateStr  = (status === 'Live / Running' || status === 'Expired' || status === 'Needs Refresh / Missing')
+    ? (asset.date_live ?? asset.date_added)
+    : asset.date_added
+  if (!dateStr) return 'expired'
+  const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
   if (days <= 14) return 'fresh'
   if (days <= 30) return 'monitor'
   if (days <= 60) return 'refreshSoon'
@@ -99,7 +104,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
     supabase
       .from('assets')
-      .select('client_id, date_added, content_type')
+      .select('client_id, date_added, date_live, status, content_type')
       .in('client_id', clients.map(c => c.id)),
     supabase
       .from('monthly_deliveries')
@@ -128,7 +133,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
     const contentTypeCounts: Record<string, number> = {}
 
     for (const asset of clientAssets) {
-      const tier = getFreshnessTier(asset.date_added)
+      const tier = getFreshnessTier(asset)
       freshness[tier]++
 
       if (asset.content_type) {
