@@ -99,10 +99,11 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
 
   // Resolve client/product IDs from our Supabase tables
-  const { data: clients } = await supabase.from('clients').select('id, name')
+  const { data: clients } = await supabase.from('clients').select('id, name, billing_day')
   const { data: products } = await supabase.from('products').select('id, name, client_id')
 
   const clientByName = new Map((clients ?? []).map(c => [c.name, c.id]))
+  const billingDayByClient = new Map((clients ?? []).map(c => [c.id, c.billing_day ?? 1]))
   const productByNameClient = new Map(
     (products ?? []).map(p => [`${p.client_id}:${p.name}`, p.id])
   )
@@ -155,8 +156,8 @@ export async function POST(req: NextRequest) {
 
     if (!error) {
       added++
-      // Auto-update delivered count for this client: baseline + asset count for current month
-      await refreshDeliveredCount(supabase, clientId)
+      // Auto-update delivered count for this client: baseline + asset count for current period
+      await refreshDeliveredCount(supabase, clientId, billingDayByClient.get(clientId) ?? 1)
     }
   }
 
