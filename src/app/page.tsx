@@ -23,6 +23,9 @@ interface ClientSummary {
   freshness: FreshnessCounts
   contentTypeCounts: Record<string, number>
   deliveries: MonthlyDelivery[]
+  currentStart: string
+  nextStart: string
+  billingDay: number
 }
 
 const FRESHNESS_TIERS = [
@@ -54,15 +57,38 @@ function getFreshnessTier(asset: { date_added: string | null; date_live?: string
   return 'expired'
 }
 
-function getCurrentAndNextMonth() {
-  const now = new Date()
-  const current = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-  return { current, next }
+/** Returns current and next period start dates for a given billing day. */
+function getBillingPeriod(billingDay: number, now = new Date()) {
+  const today = now.getDate()
+  let pYear  = now.getFullYear()
+  let pMonth = now.getMonth() // 0-indexed
+
+  if (today < billingDay) {
+    pMonth -= 1
+    if (pMonth < 0) { pMonth = 11; pYear-- }
+  }
+
+  const curDate = new Date(pYear, pMonth, billingDay)
+  const nxtDate = new Date(pYear, pMonth + 1, billingDay)
+  return {
+    currentStart: curDate.toISOString().split('T')[0],
+    nextStart:    nxtDate.toISOString().split('T')[0],
+  }
 }
 
-function formatMonth(dateStr: string) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+/** Format a period start date for display. Calendar-month clients get "Apr 2026";
+ *  custom-billing clients get "Apr 19 – May 18". */
+function formatBillingPeriod(periodStart: string, billingDay: number): string {
+  if (billingDay === 1) {
+    return new Date(periodStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  }
+  const start   = new Date(periodStart + 'T12:00:00')
+  const endDate = new Date(start.getFullYear(), start.getMonth() + 1, billingDay - 1)
+  return (
+    start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ' – ' +
+    endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  )
 }
 
 interface LeaderboardEntry {
@@ -105,7 +131,16 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
 
   if (!clients?.length) return []
 
-  const { current, next } = getCurrentAndNextMonth()
+  // Compute per-client billing periods; collect all relevant period starts for the DB query
+  const clientPeriods = new Map<string, { currentStart: string; nextStart: string; billingDay: number }>()
+  const allPeriodStarts = new Set<string>()
+  for (const client of clients) {
+    const billingDay = client.billing_day ?? 1
+    const { currentStart, nextStart } = getBillingPeriod(billingDay)
+    clientPeriods.set(client.id, { currentStart, nextStart, billingDay })
+    allPeriodStarts.add(currentStart)
+    allPeriodStarts.add(nextStart)
+  }
 
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
     supabase
@@ -116,7 +151,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       .from('monthly_deliveries')
       .select('*')
       .in('client_id', clients.map(c => c.id))
-      .in('month', [current, next])
+      .in('month', Array.from(allPeriodStarts))
       .order('month'),
   ])
 
@@ -134,6 +169,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
 
   return clients.map(client => {
     const clientAssets = assetsByClient[client.id] ?? []
+    const { currentStart, nextStart, billingDay } = clientPeriods.get(client.id)!
 
     const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0 }
     const contentTypeCounts: Record<string, number> = {}
@@ -153,6 +189,9 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       freshness,
       contentTypeCounts,
       deliveries: deliveriesByClient[client.id] ?? [],
+      currentStart,
+      nextStart,
+      billingDay,
     }
   })
 }
@@ -161,7 +200,6 @@ export const revalidate = 60
 
 export default async function DashboardPage() {
   const [summaries, leaderboard] = await Promise.all([getClientSummaries(), getLeaderboard()])
-  const { current } = getCurrentAndNextMonth()
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   return (
@@ -174,9 +212,9 @@ export default async function DashboardPage() {
 
       {/* Client cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {summaries.map(({ client, totalAssets, freshness, contentTypeCounts, deliveries }) => {
-          const currentDelivery = deliveries.find(d => d.month.startsWith(current.slice(0, 7)))
-          const nextDelivery    = deliveries.find(d => !d.month.startsWith(current.slice(0, 7)))
+        {summaries.map(({ client, totalAssets, freshness, contentTypeCounts, deliveries, currentStart, nextStart, billingDay }) => {
+          const currentDelivery = deliveries.find(d => d.month === currentStart)
+          const nextDelivery    = deliveries.find(d => d.month === nextStart)
           const isMaxed = currentDelivery ? currentDelivery.delivered >= currentDelivery.quota : false
 
           // Only show freshness tiers that have assets
@@ -205,7 +243,7 @@ export default async function DashboardPage() {
                 <div className={`px-4 pt-3 pb-2 border-b border-gray-100 ${isMaxed ? 'bg-green-50' : ''}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      {formatMonth(currentDelivery.month)} Deliveries
+                      {formatBillingPeriod(currentDelivery.month, billingDay)} Deliveries
                     </span>
                     <span className={`text-sm font-bold ${isMaxed ? 'text-green-700' : 'text-gray-700'}`}>
                       {currentDelivery.delivered}/{currentDelivery.quota}
@@ -220,14 +258,12 @@ export default async function DashboardPage() {
                   </div>
                   {isMaxed && nextDelivery && (
                     <p className="text-xs text-green-600 mt-1">
-                      Rolling → {formatMonth(nextDelivery.month)}: {nextDelivery.delivered}/{nextDelivery.quota}
+                      Rolling → {formatBillingPeriod(nextDelivery.month, billingDay)}: {nextDelivery.delivered}/{nextDelivery.quota}
                     </p>
                   )}
                   {isMaxed && !nextDelivery && (
                     <p className="text-xs text-green-600 mt-1">
-                      Quota met — next pieces roll to{' '}
-                      {new Date(new Date(currentDelivery.month).getFullYear(), new Date(currentDelivery.month).getMonth() + 1, 1)
-                        .toLocaleDateString('en-US', { month: 'short' })}
+                      Quota met — next pieces roll to {formatBillingPeriod(nextStart, billingDay)}
                     </p>
                   )}
                 </div>

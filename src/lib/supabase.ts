@@ -9,6 +9,7 @@ export interface Client {
   slug: string
   color_hex: string
   drive_url: string | null
+  billing_day: number  // day-of-month the billing period starts; default 1
 }
 
 export interface Product {
