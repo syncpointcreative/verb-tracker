@@ -44,18 +44,32 @@ export default async function ClientPage({ params }: Props) {
 
   const coveredSet = new Set<string>()
   for (const asset of allAssets) {
-    if (asset.status !== 'Needs Refresh / Missing' && asset.status !== 'Expired') {
-      if (!asset.date_added || new Date(asset.date_added) >= cutoff) {
-        coveredSet.add(`${asset.product_id}-${asset.stage}`)
-      }
+    // Skip statuses that never provide coverage
+    if (asset.status === 'Needs Refresh / Missing' || asset.status === 'Expired') continue
+    // Use date_live for live assets (measures ad fatigue); fall back to date_added
+    const relevantDateStr = (asset.status === 'Live / Running' && asset.date_live)
+      ? asset.date_live
+      : asset.date_added
+    // Covered = Fresh or Monitor (≤ EXPIRY_DAYS). Refresh Soon and beyond = needs new creative.
+    if (!relevantDateStr || new Date(relevantDateStr + 'T12:00:00') >= cutoff) {
+      coveredSet.add(`${asset.product_id}-${asset.stage}`)
     }
   }
 
-  const missingCoverage: { product: Product; stage: Stage }[] = []
+  // Check which product+stage combos have ANY live/uploading asset (even if aging)
+  const hasAnyAsset = new Set<string>()
+  for (const asset of allAssets) {
+    if (asset.status !== 'Needs Refresh / Missing') {
+      hasAnyAsset.add(`${asset.product_id}-${asset.stage}`)
+    }
+  }
+
+  const missingCoverage: { product: Product; stage: Stage; reason: 'aging' | 'missing' }[] = []
   for (const product of allProducts) {
     for (const stage of STAGES) {
       if (!coveredSet.has(`${product.id}-${stage}`)) {
-        missingCoverage.push({ product, stage })
+        const reason = hasAnyAsset.has(`${product.id}-${stage}`) ? 'aging' : 'missing'
+        missingCoverage.push({ product, stage, reason })
       }
     }
   }

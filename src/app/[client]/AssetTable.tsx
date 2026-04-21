@@ -17,10 +17,11 @@ interface PendingChange {
 // ─── Freshness meter ──────────────────────────────────────────────────────────
 
 const FRESHNESS = [
-  { maxDays: 14,       label: 'Fresh',             emoji: null, bar: 'bg-green-400',  text: 'text-green-700',  track: 'bg-green-100'  },
-  { maxDays: 30,       label: 'Overripe',           emoji: null, bar: 'bg-yellow-400', text: 'text-yellow-700', track: 'bg-yellow-100' },
-  { maxDays: 60,       label: 'Consider Replacing', emoji: null, bar: 'bg-orange-400', text: 'text-orange-700', track: 'bg-orange-100' },
-  { maxDays: Infinity, label: 'Rotten',             emoji: '💩', bar: 'bg-red-400',    text: 'text-red-700',    track: 'bg-red-100'    },
+  { maxDays: 7,        label: 'Fresh',        emoji: null, bar: 'bg-green-400',  text: 'text-green-700',  track: 'bg-green-100'  },
+  { maxDays: 14,       label: 'Monitor',      emoji: null, bar: 'bg-yellow-400', text: 'text-yellow-700', track: 'bg-yellow-100' },
+  { maxDays: 21,       label: 'Refresh Soon', emoji: null, bar: 'bg-orange-400', text: 'text-orange-700', track: 'bg-orange-100' },
+  { maxDays: 30,       label: 'Stale',        emoji: null, bar: 'bg-red-400',    text: 'text-red-700',    track: 'bg-red-100'    },
+  { maxDays: Infinity, label: 'Expired',      emoji: '💩', bar: 'bg-gray-400',   text: 'text-gray-500',   track: 'bg-gray-100'   },
 ]
 
 function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
@@ -31,7 +32,7 @@ function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status:
 
   const days = Math.floor((Date.now() - new Date(dateLive + 'T12:00:00').getTime()) / 86_400_000)
   const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[FRESHNESS.length - 1]
-  const pct  = Math.min(100, Math.round((days / 60) * 100)) // 60 days = full bar
+  const pct  = Math.min(100, Math.round((days / 30) * 100)) // 30 days = full bar
 
   return (
     <div className="flex flex-col gap-0.5 min-w-[90px]">
