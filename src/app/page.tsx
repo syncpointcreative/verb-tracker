@@ -26,10 +26,10 @@ interface ClientSummary {
 }
 
 const FRESHNESS_TIERS = [
-  { key: 'fresh',       maxDays: 14,       label: 'Fresh',        dot: 'bg-green-400',  text: 'text-green-700'  },
-  { key: 'monitor',     maxDays: 30,       label: 'Monitor',      dot: 'bg-yellow-400', text: 'text-yellow-700' },
-  { key: 'refreshSoon', maxDays: 60,       label: 'Refresh Soon', dot: 'bg-orange-400', text: 'text-orange-700' },
-  { key: 'stale',       maxDays: 90,       label: 'Stale',        dot: 'bg-red-400',    text: 'text-red-700'    },
+  { key: 'fresh',       maxDays: 7,        label: 'Fresh',        dot: 'bg-green-400',  text: 'text-green-700'  },
+  { key: 'monitor',     maxDays: 14,       label: 'Monitor',      dot: 'bg-yellow-400', text: 'text-yellow-700' },
+  { key: 'refreshSoon', maxDays: 21,       label: 'Refresh Soon', dot: 'bg-orange-400', text: 'text-orange-700' },
+  { key: 'stale',       maxDays: 30,       label: 'Stale',        dot: 'bg-red-400',    text: 'text-red-700'    },
   { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-gray-400',   text: 'text-gray-500'   },
 ] as const
 
@@ -41,10 +41,10 @@ function getFreshnessTier(asset: { date_added: string | null; date_live?: string
     : asset.date_added
   if (!dateStr) return 'expired'
   const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
-  if (days <= 14) return 'fresh'
-  if (days <= 30) return 'monitor'
-  if (days <= 60) return 'refreshSoon'
-  if (days <= 90) return 'stale'
+  if (days <= 7)  return 'fresh'
+  if (days <= 14) return 'monitor'
+  if (days <= 21) return 'refreshSoon'
+  if (days <= 30) return 'stale'
   return 'expired'
 }
 
@@ -291,11 +291,11 @@ export default async function DashboardPage() {
             <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 ${tier.text}`}>
               <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
               {tier.label} — {
-                tier.key === 'fresh'       ? '0–14 days' :
-                tier.key === 'monitor'     ? '15–30 days' :
-                tier.key === 'refreshSoon' ? '31–60 days' :
-                tier.key === 'stale'       ? '61–90 days' :
-                '90+ days'
+                tier.key === 'fresh'       ? '0–7 days' :
+                tier.key === 'monitor'     ? '8–14 days' :
+                tier.key === 'refreshSoon' ? '15–21 days' :
+                tier.key === 'stale'       ? '22–30 days' :
+                '31+ days'
               }
             </div>
           ))}

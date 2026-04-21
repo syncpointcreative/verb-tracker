@@ -17,6 +17,7 @@ interface BriefSection {
 interface MissingItem {
   product: Product
   stage: Stage
+  reason: 'aging' | 'missing'
 }
 
 interface Props {
@@ -36,10 +37,15 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
         : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
     }`
 
-  const suggestions: Record<Stage, string> = {
+  const freshSuggestions: Record<Stage, string> = {
     Awareness:     'Hook video — stop the scroll, introduce product',
     Consideration: 'Demo, tutorial, or testimonial showing value',
     Conversion:    'Promo/offer-led video with clear CTA',
+  }
+  const agingSuggestions: Record<Stage, string> = {
+    Awareness:     'Existing creative hitting Refresh Soon — start new hook video',
+    Consideration: 'Existing creative aging out — prep fresh demo or testimonial',
+    Conversion:    'Existing creative aging out — prep new promo or offer video',
   }
 
   return (
@@ -74,7 +80,7 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-amber-100">
-                    {missingCoverage.map(({ product, stage }) => (
+                    {missingCoverage.map(({ product, stage, reason }) => (
                       <tr key={`${product.id}-${stage}`} className="hover:bg-amber-100/50">
                         <td className="px-4 py-2 font-medium text-gray-800">{product.name}</td>
                         <td className="px-4 py-2">
@@ -82,7 +88,12 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                             {stage}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-gray-600 text-xs">{suggestions[stage]}</td>
+                        <td className="px-4 py-2 text-gray-600 text-xs">
+                          {reason === 'aging'
+                            ? agingSuggestions[stage]
+                            : freshSuggestions[stage]
+                          }
+                        </td>
                       </tr>
                     ))}
                   </tbody>

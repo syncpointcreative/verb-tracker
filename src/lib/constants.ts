@@ -43,7 +43,7 @@ export const STATUS_CONFIG: Record<AssetStatus, { bg: string; text: string; dot:
 }
 
 export const TARGET_ASSETS_PER_STAGE = 3
-export const EXPIRY_DAYS = 90
+export const EXPIRY_DAYS = 14  // assets ≤14 days (Fresh/Monitor) = covered; 15+ (Refresh Soon) = needs new creative
 export const SLACK_CHANNEL_ID = 'C0843S6QRA8'
 
 // Naming convention parser maps
