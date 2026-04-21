@@ -34,12 +34,18 @@ const FRESHNESS_TIERS = [
 ] as const
 
 function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts {
-  // Use date_live for live assets; fall back to date_added for non-live
-  const status   = asset.status ?? ''
-  const dateStr  = (status === 'Live / Running' || status === 'Expired' || status === 'Needs Refresh / Missing')
-    ? (asset.date_live ?? asset.date_added)
-    : asset.date_added
+  const status = asset.status ?? ''
+
+  // Pre-launch: fatigue clock hasn't started yet — always Fresh
+  if (status === 'Ready to Upload') return 'fresh'
+
+  // Definitionally expired
+  if (status === 'Expired') return 'expired'
+
+  // Live / Running and Needs Refresh / Missing: count from date_live if set, else date_added
+  const dateStr = asset.date_live ?? asset.date_added
   if (!dateStr) return 'expired'
+
   const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
   if (days <= 7)  return 'fresh'
   if (days <= 14) return 'monitor'
