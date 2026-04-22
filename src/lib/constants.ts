@@ -43,8 +43,11 @@ export const STATUS_CONFIG: Record<AssetStatus, { bg: string; text: string; dot:
 }
 
 export const TARGET_ASSETS_PER_STAGE = 3
-export const EXPIRY_DAYS = 14  // assets ≤14 days (Fresh/Monitor) = covered; 15+ (Refresh Soon) = needs new creative
+export const EXPIRY_DAYS = 14        // assets ≤14 days (Fresh/Monitor) = covered; 15+ (Refresh Soon) = needs new creative
+export const REFRESH_SOON_DAYS = 15  // day threshold that triggers Refresh Soon + Slack alert
 export const SLACK_CHANNEL_ID = 'C0843S6QRA8'
+// Channel for outbound asset-need alerts — set SLACK_ASSET_NEEDS_CHANNEL_ID in Vercel env vars
+export const ASSET_NEEDS_CHANNEL_ID = process.env.SLACK_ASSET_NEEDS_CHANNEL_ID ?? ''
 
 // Naming convention parser maps
 export const CLIENT_CODES: Record<string, string> = {
