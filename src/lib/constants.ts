@@ -62,6 +62,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   SSB: 'Sea Salt Beef', SPV: 'Salt & Pepper Venison',
   JAL: 'Jalapeño Beef', TAC: 'Taco Seasoned Beef',
   OTK: 'Original Turkey', VAR: 'Variety Pack',
+  OGC: 'Original Chicken', NHC: 'Nashville Hot Chicken',
+  SBC: 'Savory Breakfast Chicken', CTP: 'Chicken Trial Pack',
   HH: 'Himalayan Honey (2lb Tub)',
   OBL: 'Ocean Breeze Laundry Detergent Sheets',
   DP: 'Dishwashing Eco Pods', LDS: 'Lemon Detergent Eco Sheets for Dishwashing',
@@ -70,6 +72,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   CPB: 'Chocolate Peanut Butter', CC: 'Cookies & Cream',
   MC: 'Mint Chocolate', EP: 'Electrolyte Packs',
   FVP: 'Variety Pack', AF: 'Any Flavor', AT: 'Any Tea',
+  ISO: 'Immune Support Orange', MVOM: 'Multi-Vitamin Orange-Mango',
+  JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
 }
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',

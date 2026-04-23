@@ -107,6 +107,10 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'TAC', name: 'Taco Seasoned Beef' },
       { code: 'OTK', name: 'Original Turkey' },
       { code: 'VAR', name: 'Variety Pack' },
+      { code: 'OGC', name: 'Original Chicken' },
+      { code: 'NHC', name: 'Nashville Hot Chicken' },
+      { code: 'SBC', name: 'Savory Breakfast Chicken' },
+      { code: 'CTP', name: 'Chicken Trial Pack' },
     ],
   },
   {
@@ -130,6 +134,10 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'FVP', name: 'Variety Pack' },
       { code: 'AF',  name: 'Any Flavor' },
       { code: 'AT',  name: 'Any Tea' },
+      { code: 'ISO',  name: 'Immune Support Orange' },
+      { code: 'MVOM', name: 'Multi-Vitamin Orange-Mango' },
+      { code: 'JHCG', name: 'Joint Health Citrus Ginger' },
+      { code: 'SSVM', name: 'Sleep Support Vanilla Mint' },
     ],
   },
   {
