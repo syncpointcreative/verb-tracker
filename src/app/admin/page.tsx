@@ -18,7 +18,7 @@ interface Asset {
 }
 
 const STAGES = ['Awareness', 'Consideration', 'Conversion']
-const STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing']
+const STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
 
 function fmt(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })

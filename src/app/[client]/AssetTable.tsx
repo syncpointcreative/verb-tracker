@@ -95,7 +95,7 @@ const CONTENT_TYPES = [
   'Static Imagery', 'Motion Graphics', 'Affiliate Video',
 ]
 
-const ALL_STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing']
+const ALL_STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
 
 const selectCls = "border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
 const activeSelectCls = "border-blue-400 ring-1 ring-blue-300 rounded-lg px-2.5 py-1.5 text-sm text-blue-700 bg-blue-50 focus:outline-none"

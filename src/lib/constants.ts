@@ -40,6 +40,8 @@ export const STATUS_CONFIG: Record<AssetStatus, { bg: string; text: string; dot:
   'Live / Running':          { bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500' },
   'Expired':                 { bg: 'bg-red-100',    text: 'text-red-800',    dot: 'bg-red-500' },
   'Needs Refresh / Missing': { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' },
+  'Pulled':                  { bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500' },
+  'Removed by Request':      { bg: 'bg-gray-100',   text: 'text-gray-600',   dot: 'bg-gray-400' },
 }
 
 export const TARGET_ASSETS_PER_STAGE = 3
