@@ -156,7 +156,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       .order('month'),
   ])
 
-  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'content_type'>[]> = {}
+  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type'>[]> = {}
   for (const asset of (assets ?? [])) {
     if (!assetsByClient[asset.client_id]) assetsByClient[asset.client_id] = []
     assetsByClient[asset.client_id].push(asset)
