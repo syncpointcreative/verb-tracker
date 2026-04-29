@@ -39,7 +39,8 @@ export default async function MatrixPage() {
   for (const asset of allAssets) {
     const cell = matrix[asset.product_id]?.[asset.stage as Stage]
     if (!cell) continue
-    if (asset.status !== 'Needs Refresh / Missing') {
+    const isInactive = ['Needs Refresh / Missing', 'Pulled', 'Removed by Request'].includes(asset.status)
+    if (!isInactive) {
       cell.total++
       const expired = asset.date_added ? new Date(asset.date_added) < cutoff : false
       if (!expired && asset.status !== 'Expired') {

@@ -16,7 +16,7 @@ import type { AssetStatus, Stage } from '@/lib/supabase'
 
 const VALID_STAGES = new Set<Stage>(['Awareness', 'Consideration', 'Conversion'])
 const VALID_STATUSES = new Set<AssetStatus>([
-  'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing',
+  'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request',
 ])
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
