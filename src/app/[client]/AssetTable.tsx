@@ -25,7 +25,10 @@ const FRESHNESS = [
 ]
 
 function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
-  // Only count once the asset is live — show neutral state otherwise
+  // Show neutral state for statuses that are not actively running
+  if (status === 'Pulled' || status === 'Removed by Request') {
+    return <span className="text-gray-400 text-xs italic">—</span>
+  }
   if (status === 'Ready to Upload' || !dateLive) {
     return <span className="text-gray-300 text-xs">Not live yet</span>
   }

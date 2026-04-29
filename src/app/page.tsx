@@ -45,6 +45,7 @@ function getFreshnessTier(asset: { date_added: string | null; date_live?: string
   // Definitionally expired
   if (status === 'Expired') return 'expired'
 
+
   // Live / Running and Needs Refresh / Missing: count from date_live if set, else date_added
   const dateStr = asset.date_live ?? asset.date_added
   if (!dateStr) return 'expired'
@@ -175,6 +176,8 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
     const contentTypeCounts: Record<string, number> = {}
 
     for (const asset of clientAssets) {
+      // Pulled / removed assets don't contribute to freshness counts
+      if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
       const tier = getFreshnessTier(asset)
       freshness[tier]++
 

@@ -42,10 +42,12 @@ export default async function ClientPage({ params }: Props) {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS)
 
+  const NON_COVERING_STATUSES = ['Needs Refresh / Missing', 'Expired', 'Pulled', 'Removed by Request']
+
   const coveredSet = new Set<string>()
   for (const asset of allAssets) {
     // Skip statuses that never provide coverage
-    if (asset.status === 'Needs Refresh / Missing' || asset.status === 'Expired') continue
+    if (NON_COVERING_STATUSES.includes(asset.status)) continue
     // Use date_live for live assets (measures ad fatigue); fall back to date_added
     const relevantDateStr = (asset.status === 'Live / Running' && asset.date_live)
       ? asset.date_live
@@ -59,7 +61,7 @@ export default async function ClientPage({ params }: Props) {
   // Check which product+stage combos have ANY live/uploading asset (even if aging)
   const hasAnyAsset = new Set<string>()
   for (const asset of allAssets) {
-    if (asset.status !== 'Needs Refresh / Missing') {
+    if (!NON_COVERING_STATUSES.includes(asset.status)) {
       hasAnyAsset.add(`${asset.product_id}-${asset.stage}`)
     }
   }
