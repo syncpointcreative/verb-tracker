@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase'
 import { STAGE_CONFIG, STAGES, TARGET_ASSETS_PER_STAGE, EXPIRY_DAYS } from '@/lib/constants'
 import type { Client, Product, Asset, Stage } from '@/lib/supabase'
 
-export const revalidate = 60
+export const revalidate = 0
 
 interface CellData {
   active: number

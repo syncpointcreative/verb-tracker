@@ -199,7 +199,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   })
 }
 
-export const revalidate = 60
+export const revalidate = 0
 
 export default async function DashboardPage() {
   const [summaries, leaderboard] = await Promise.all([getClientSummaries(), getLeaderboard()])

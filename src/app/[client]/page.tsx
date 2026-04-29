@@ -9,7 +9,7 @@ interface Props {
   params: { client: string }
 }
 
-export const revalidate = 60
+export const revalidate = 0
 
 export default async function ClientPage({ params }: Props) {
   const supabase = createServerClient()
