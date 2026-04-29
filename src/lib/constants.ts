@@ -55,6 +55,7 @@ export const ASSET_NEEDS_CHANNEL_ID = process.env.SLACK_ASSET_NEEDS_CHANNEL_ID ?
 export const CLIENT_CODES: Record<string, string> = {
   BIOM: 'Biom', CHOMPS: 'Chomps', HIMA: 'Himapure',
   HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
+  MOMO: 'Momofuku',
 }
 export const PRODUCT_CODES: Record<string, string> = {
   FT: 'FaceTub',
@@ -76,6 +77,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   FVP: 'Variety Pack', AF: 'Any Flavor', AT: 'Any Tea',
   ISO: 'Immune Support Orange', MVOM: 'Multi-Vitamin Orange-Mango',
   JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
+  CCSD: 'Chili Crunch Sushi Dip',
 }
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',

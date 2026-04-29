@@ -146,6 +146,12 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'FT', name: 'FaceTub' },
     ],
   },
+  {
+    client: 'Momofuku', code: 'MOMO',
+    products: [
+      { code: 'CCSD', name: 'Chili Crunch Sushi Dip' },
+    ],
+  },
 ]
 
 const TYPE_CODES = [
