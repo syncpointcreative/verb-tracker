@@ -20,8 +20,8 @@ export interface ParsedFilename {
 }
 
 export function parseFilename(filename: string): ParsedFilename {
-  // Strip extension
-  const base = filename.replace(/\.[^.]+$/, '').toUpperCase()
+  // Strip ALL extensions (handles double extensions like .mp4.MOV)
+  const base = filename.replace(/(\.[^.]+)+$/, '').toUpperCase()
   const hasCaption = base.includes('CAPTION')
 
   const parts = base.split('-')
@@ -84,20 +84,31 @@ function toTitleCase(slug: string): string {
 }
 
 function parseDateCode(code: string | undefined): Date | null {
-  if (!code || code.length < 6) return null
+  if (!code) return null
+  // Trim whitespace and strip any non-digit trailing characters (e.g. ".MP4" residue)
+  const clean = code.trim().replace(/\D.*$/, '')
+  if (clean.length < 6) return null
   // Handle both MMDDYY (6 digits) and MMDDYYYY (8 digits)
-  const mm = parseInt(code.slice(0, 2))
-  const dd = parseInt(code.slice(2, 4))
-  const yearStr = code.slice(4)
+  const mm = parseInt(clean.slice(0, 2), 10)
+  const dd = parseInt(clean.slice(2, 4), 10)
+  const yearStr = clean.slice(4, clean.length >= 8 ? 8 : 6)
   const yy = yearStr.length === 4
-    ? parseInt(yearStr)          // full 4-digit year: 2026
-    : 2000 + parseInt(yearStr)  // 2-digit year: 26 → 2026
+    ? parseInt(yearStr, 10)           // full 4-digit year: 2026
+    : 2000 + parseInt(yearStr, 10)   // 2-digit year: 26 → 2026
+  // Basic sanity check — avoid absurd roll-overs from corrupt codes
   if (isNaN(mm) || isNaN(dd) || isNaN(yy)) return null
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
+  if (yy < 2020 || yy > 2100) return null
   return new Date(yy, mm - 1, dd)
 }
 
 function extractDateFromFilename(base: string): Date | null {
-  // Try to find a 6-digit date pattern (MMDDYY or YYYYMMDD)
+  // Prefer 8-digit MMDDYYYY over 6-digit MMDDYY to avoid year truncation
+  const m8 = base.match(/(\d{8})/)
+  if (m8) {
+    const parsed = parseDateCode(m8[1])
+    if (parsed) return parsed
+  }
   const m6 = base.match(/(\d{6})/)
   if (m6) return parseDateCode(m6[1])
   return null
