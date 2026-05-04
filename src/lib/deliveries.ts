@@ -3,13 +3,12 @@
  *
  * refreshDeliveredCount(supabase, clientId, billingDay?)
  *   - billingDay defaults to 1 (calendar month). Pass 19 for FaceTub-style periods.
- *   - Only counts assets added on or after SYSTEM_LAUNCH_DATE.
+ *   - Counts assets by created_at (when submitted to the system), not date_added (filename date).
+ *   - The April baseline already accounts for pre-system content; no launch-date cutoff needed.
  *   - Caps delivered at quota; overflows roll into the next billing period.
  *   - Safe to run multiple times — always recalculates from the fixed baseline.
  */
 import { SupabaseClient } from '@supabase/supabase-js'
-
-const SYSTEM_LAUNCH_DATE = '2026-04-08'
 
 /** Returns "YYYY-MM-DD" for the given year, month (1-indexed), and day. */
 function periodStr(year: number, month: number, day: number): string {
@@ -40,13 +39,14 @@ async function countNewAssets(
   periodStart: string,
   periodEnd: string
 ): Promise<number> {
-  const countFrom = periodStart < SYSTEM_LAUNCH_DATE ? SYSTEM_LAUNCH_DATE : periodStart
+  // Count by created_at (actual submission date) so that filename dates
+  // don't affect which billing period an asset contributes to.
   const { count } = await supabase
     .from('assets')
     .select('id', { count: 'exact', head: true })
     .eq('client_id', clientId)
-    .gte('date_added', countFrom)
-    .lt('date_added', periodEnd)
+    .gte('created_at', periodStart)
+    .lt('created_at', periodEnd)
   return count ?? 0
 }
 
