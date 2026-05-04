@@ -39,12 +39,14 @@ async function countNewAssets(
   periodStart: string,
   periodEnd: string
 ): Promise<number> {
-  // Count by created_at (actual submission date) so that filename dates
-  // don't affect which billing period an asset contributes to.
+  // Count only Slack-submitted assets (slack_message_ts IS NOT NULL).
+  // Manually-entered assets are backfills already captured in the baseline.
+  // Use created_at (submission timestamp) so filename dates don't affect bucketing.
   const { count } = await supabase
     .from('assets')
     .select('id', { count: 'exact', head: true })
     .eq('client_id', clientId)
+    .not('slack_message_ts', 'is', null)
     .gte('created_at', periodStart)
     .lt('created_at', periodEnd)
   return count ?? 0
