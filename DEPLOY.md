@@ -70,7 +70,10 @@ gh repo create verb-tracker --private --push --source=.
 | `SUPABASE_SERVICE_ROLE_KEY` | Your service role key |
 | `SLACK_SIGNING_SECRET` | From Slack app config |
 | `SLACK_BOT_TOKEN` | Your bot token (`xoxb-...`) |
-| `SLACK_CHANNEL_ID` | `C0843S6QRA8` |
+| `SLACK_CHANNEL_ID` | `C0843S6QRA8` (submissions channel) |
+| `SLACK_ASSET_NEEDS_CHANNEL_ID` | `C0AU84WB31D` (#asset-needs channel) |
+| `CRON_SECRET` | A random secret — run `openssl rand -hex 32` to generate one |
+| `NEXT_PUBLIC_APP_URL` | Your Vercel deployment URL, e.g. `https://verb-tracker-abc123.vercel.app` |
 
 5. Click **Deploy** — Vercel handles the build automatically
 
@@ -90,12 +93,17 @@ Under **OAuth & Permissions → Bot Token Scopes**, add:
 - `channels:history` — read messages in public channels
 - `files:read` — access file metadata
 - `channels:read` — list channels
+- `chat:write` — **required** for the daily freshness-check cron to post alerts to #asset-needs
 
 Install the app to your workspace and copy the **Bot User OAuth Token** (`xoxb-...`) → this is `SLACK_BOT_TOKEN`.
 
-### 4c. Invite the bot to your channel
-In Slack, go to `#creative-asset-submissions-only` and type:
+### 4c. Invite the bot to your channels
+In Slack, invite the bot to both channels it needs access to:
 ```
+# In #creative-asset-submissions-only (for receiving asset events):
+/invite @VERB Tracker
+
+# In #asset-needs (for posting daily freshness alerts):
 /invite @VERB Tracker
 ```
 
@@ -171,3 +179,5 @@ curl -X PATCH "https://your-app.vercel.app/api/assets?id=<asset-uuid>" \
 | Upsert errors on Slack route | Run the `ALTER TABLE` constraint SQL from step 1d |
 | `SUPABASE_SERVICE_ROLE_KEY` errors | Make sure it's set in Vercel env vars (not just locally) |
 | Build fails on Vercel | Check TypeScript errors locally with `npm run build` first |
+| Freshness alerts not posting to #asset-needs | Check all three: (1) `CRON_SECRET` is set in Vercel env vars, (2) `SLACK_ASSET_NEEDS_CHANNEL_ID` is set, (3) bot has `chat:write` scope and is invited to #asset-needs |
+| Cron returns 401 Unauthorized | `CRON_SECRET` in Vercel env vars doesn't match what's in `.env.local` — regenerate with `openssl rand -hex 32` and set the same value in both places |
