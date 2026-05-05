@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
   let totalAlerted = 0
 
   for (const [, clientAssets] of byClient) {
-    const client = clientAssets[0].client as { id: string; name: string; slug: string } | null
+    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
     if (!client) continue
 
     // Sort by days live descending (most urgent first)
