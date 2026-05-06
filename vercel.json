@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/freshness-check",
       "schedule": "0 9 * * 4"
+    },
+    {
+      "path": "/api/cron/drive-sync",
+      "schedule": "0 * * * *"
     }
   ]
 }

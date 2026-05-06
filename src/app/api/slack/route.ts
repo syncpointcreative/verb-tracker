@@ -1,14 +1,20 @@
 /**
  * POST /api/slack
  *
- * Slack Event API webhook — receives file_shared and message events
- * from the #creative-asset-submissions-only channel and upserts assets.
+ * Slack Event API webhook — receives file_shared / message events
+ * from #creative-asset-submissions-only and upserts assets, AND handles
+ * reaction_added events to queue ✅-approved assets for Google Drive upload.
  *
  * Slack setup:
  *   1. Enable "Event Subscriptions" in your Slack app config
- *   2. Subscribe to: message.channels (or files:read)
+ *   2. Subscribe to: message.channels, reaction_added
  *   3. Set the Request URL to: https://<your-domain>/api/slack
  *   4. Add SLACK_SIGNING_SECRET + SLACK_BOT_TOKEN to your Vercel env vars
+ *
+ * Google Drive auto-download:
+ *   When Libby (U072U0L0Y4V) adds ✅ to a message in the submissions channel,
+ *   the files attached to that message are queued in drive_queue for the
+ *   hourly /api/cron/drive-sync cron to pick up and upload.
  */
 
 import { createHmac, timingSafeEqual } from 'crypto'
@@ -17,6 +23,9 @@ import { createServerClient } from '@/lib/supabase'
 import { parseFilename, inferStage } from '@/lib/parser'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 import { refreshDeliveredCount } from '@/lib/deliveries'
+
+// Libby's Slack user ID — only her ✅ reactions trigger Drive upload
+const LIBBY_USER_ID = 'U072U0L0Y4V'
 
 // ─── Slack signature verification ────────────────────────────────────────────
 
@@ -38,6 +47,67 @@ async function verifySlackSignature(req: NextRequest, rawBody: string): Promise<
     return timingSafeEqual(Buffer.from(computed), Buffer.from(signature))
   } catch {
     return false
+  }
+}
+
+// ─── Drive queue helper ───────────────────────────────────────────────────────
+
+/**
+ * Fetch the message at `messageTs` from the submissions channel,
+ * resolve each attached file's client name, and insert pending rows
+ * into drive_queue for the hourly cron to process.
+ */
+async function queueApprovedFiles(messageTs: string): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return
+
+  // Fetch the specific message
+  const historyRes = await fetch(
+    `https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}&latest=${messageTs}&limit=1&inclusive=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  const history = await historyRes.json() as {
+    ok: boolean
+    messages?: Array<{
+      files?: Array<{
+        id: string
+        name: string
+        url_private_download: string
+        mimetype: string
+      }>
+    }>
+  }
+
+  const message = history.messages?.[0]
+  if (!message?.files?.length) return
+
+  const supabase = createServerClient()
+  const { data: clients } = await supabase.from('clients').select('id, name')
+  const clientByName = new Map((clients ?? []).map(c => [c.name, c.id]))
+
+  for (const file of message.files) {
+    const parsed = parseFilename(file.name)
+    if (!parsed.clientName) continue
+    if (!clientByName.has(parsed.clientName)) continue
+
+    // Avoid re-queuing the same file if reacted again
+    const { data: existing } = await supabase
+      .from('drive_queue')
+      .select('id')
+      .eq('slack_file_id', file.id)
+      .in('status', ['pending', 'processing', 'done'])
+      .limit(1)
+
+    if (existing?.length) continue
+
+    await supabase.from('drive_queue').insert({
+      slack_file_id:        file.id,
+      file_name:            file.name,
+      url_private_download: file.url_private_download,
+      mimetype:             file.mimetype || 'video/mp4',
+      client_name:          parsed.clientName,
+      status:               'pending',
+    })
   }
 }
 
@@ -68,6 +138,27 @@ export async function POST(req: NextRequest) {
   // Only handle events from our channel
   const event = payload.event as Record<string, unknown> | undefined
   if (!event) return NextResponse.json({ ok: true })
+
+  // ─── reaction_added: Libby's ✅ queues file for Drive upload ────────────────
+  if (event.type === 'reaction_added') {
+    const reaction  = event.reaction as string | undefined
+    const userId    = event.user as string | undefined
+    const item      = event.item as Record<string, unknown> | undefined
+    const itemChannel = item?.channel as string | undefined
+
+    // Only care about ✅ from Libby in the submissions channel
+    if (
+      reaction === 'white_check_mark' &&
+      userId === LIBBY_USER_ID &&
+      itemChannel === SLACK_CHANNEL_ID
+    ) {
+      const messageTs = item?.ts as string | undefined
+      if (messageTs) {
+        await queueApprovedFiles(messageTs)
+      }
+    }
+    return NextResponse.json({ ok: true })
+  }
 
   const channelId = (event.channel ?? event.channel_id) as string | undefined
   if (channelId && channelId !== SLACK_CHANNEL_ID) {

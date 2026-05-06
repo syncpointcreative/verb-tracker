@@ -125,7 +125,54 @@ Update this in your Vercel environment variables, then redeploy.
 
 ---
 
-## 5. How Assets Flow In
+## 5. Google Drive Auto-Download (✅ Approval Flow)
+
+When Libby reacts to a message in `#creative-asset-submissions-only` with ✅, the attached files are automatically uploaded to the correct client subfolder in Google Drive.
+
+### 5a. Create a Google service account
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → your project (or create one)
+2. Enable the **Google Drive API**: APIs & Services → Enable APIs → search "Drive" → Enable
+3. Go to **IAM & Admin → Service Accounts** → Create Service Account
+   - Name: `verb-drive-upload` (or anything)
+   - Click **Create and Continue**, skip role grants, click **Done**
+4. Click the service account → **Keys** tab → **Add Key → Create new key → JSON**
+5. Download the JSON file — this is `GOOGLE_SERVICE_ACCOUNT_JSON`
+
+### 5b. Share your Drive folder with the service account
+
+1. Open [Google Drive](https://drive.google.com) and navigate to your root assets folder
+   (currently `1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm`)
+2. Right-click → **Share** → paste the service account email (looks like `verb-drive-upload@your-project.iam.gserviceaccount.com`)
+3. Give it **Editor** access → Share
+
+### 5c. Add env vars to Vercel
+
+| Variable | Value |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | The full contents of the JSON key file (paste the whole thing) |
+| `GOOGLE_DRIVE_FOLDER_ID` | `1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm` (your root folder) |
+
+### 5d. Add `reaction_added` to Slack Event Subscriptions
+
+1. In your Slack app config → **Event Subscriptions → Subscribe to bot events**
+2. Add `reaction_added` (in addition to `message.channels`)
+3. Save Changes
+
+The bot will now listen for ✅ reactions from Libby. Files are queued immediately; the hourly cron at `/api/cron/drive-sync` uploads them to `{root}/{ClientName}/filename.mp4`.
+
+Client subfolders are created automatically if they don't exist.
+
+### 5e. Retry failed uploads
+
+If an upload errors (network blip, token issue), the `drive_queue` row gets `status = 'error'`. To retry, reset it in Supabase:
+```sql
+UPDATE drive_queue SET status = 'pending', error = NULL WHERE status = 'error';
+```
+
+---
+
+## 6. How Assets Flow In
 
 Once everything is wired up:
 
@@ -154,7 +201,7 @@ Once everything is wired up:
 
 ---
 
-## 6. Updating Asset Statuses
+## 7. Updating Asset Statuses
 
 The simplest approach is the Supabase Table Editor:
 1. Go to your Supabase project → **Table Editor → assets**
@@ -170,7 +217,7 @@ curl -X PATCH "https://your-app.vercel.app/api/assets?id=<asset-uuid>" \
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Issue | Fix |
 |---|---|
@@ -181,3 +228,8 @@ curl -X PATCH "https://your-app.vercel.app/api/assets?id=<asset-uuid>" \
 | Build fails on Vercel | Check TypeScript errors locally with `npm run build` first |
 | Freshness alerts not posting to #asset-needs | Check all three: (1) `CRON_SECRET` is set in Vercel env vars, (2) `SLACK_ASSET_NEEDS_CHANNEL_ID` is set, (3) bot has `chat:write` scope and is invited to #asset-needs |
 | Cron returns 401 Unauthorized | `CRON_SECRET` in Vercel env vars doesn't match what's in `.env.local` — regenerate with `openssl rand -hex 32` and set the same value in both places |
+| Drive upload not triggering | Check that `reaction_added` is added to Slack Event Subscriptions bot events |
+| Drive upload: `GOOGLE_SERVICE_ACCOUNT_JSON not set` | Paste the full JSON key contents as the env var value in Vercel |
+| Drive upload: token exchange failed | The service account email hasn't been granted Editor access on the Drive folder |
+| Drive upload: Slack file download 403 | The Slack bot token (`SLACK_BOT_TOKEN`) is missing or expired |
+| Files queued but never uploaded | Check Vercel cron logs for `/api/cron/drive-sync` — reset errors with `UPDATE drive_queue SET status='pending', error=NULL WHERE status='error'` |
