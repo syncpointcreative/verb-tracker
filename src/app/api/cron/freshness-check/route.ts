@@ -125,7 +125,8 @@ export async function GET(req: NextRequest) {
       const lines = stageAssets.map(a => {
         const days = daysSince(getRelevantDate(a) ?? '')
         const type = a.content_type ?? 'Unknown type'
-        return `    › ${type} — *${days} days* live`
+        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
+        return `    › ${product} — ${type} — *${days} days* live`
       })
 
       stageBlocks.push(
