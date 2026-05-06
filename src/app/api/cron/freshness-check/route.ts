@@ -1,17 +1,26 @@
 /**
  * GET /api/cron/freshness-check
  *
- * Runs daily (via Vercel Cron at 0 9 * * *).
- * Finds all Live/Running and Needs Refresh assets that have crossed the
- * REFRESH_SOON_DAYS threshold and haven't been alerted yet, then:
- *   1. Posts a grouped alert to #asset-needs in Slack
- *   2. Stamps refresh_notified_at on each asset so it won't alert again
+ * Runs Monday and Thursday via Vercel cron.
+ *
+ * Monday — "This Week's Content Needs"
+ *   All assets ≥15 days live, grouped by client/stage.
+ *   Stamps refresh_notified_at so Thursday can track the week's baseline.
+ *
+ * Thursday — "Remaining Content Needs"
+ *   Takes Monday's list, checks which product+stage combos got new
+ *   Slack-submitted creative this week. Shows strikethrough for completed,
+ *   bold for still outstanding.
+ *
+ * Manual testing:
+ *   curl ".../api/cron/freshness-check?run=monday" -H "Authorization: Bearer <CRON_SECRET>"
+ *   curl ".../api/cron/freshness-check?run=thursday" -H "Authorization: Bearer <CRON_SECRET>"
  *
  * Required env vars:
  *   CRON_SECRET                  — must match Authorization: Bearer header
  *   SLACK_BOT_TOKEN              — bot token with chat:write scope
  *   SLACK_ASSET_NEEDS_CHANNEL_ID — channel ID for #asset-needs
- *   NEXT_PUBLIC_APP_URL          — e.g. https://verb.vercel.app (for deep links)
+ *   NEXT_PUBLIC_APP_URL          — e.g. https://verb-tracker.vercel.app
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -29,15 +38,32 @@ function getRelevantDate(asset: {
   return asset.date_added
 }
 
+/** Compare whole UTC calendar days to avoid time-of-day drift. */
 function daysSince(dateStr: string): number {
-  // Compare whole UTC calendar days so the 9am cron reliably catches
-  // assets that crossed the threshold overnight. The noon anchor would
-  // push the trigger point to noon UTC — 3 hours past the cron window.
   const [year, month, day] = dateStr.split('-').map(Number)
   const then = Date.UTC(year, month - 1, day)
   const now = new Date()
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
   return Math.floor((today - then) / (1000 * 60 * 60 * 24))
+}
+
+/** Returns the ISO timestamp for midnight UTC on the most recent Monday. */
+function getMostRecentMonday(): string {
+  const now = new Date()
+  const dow = now.getUTCDay() // 0=Sun, 1=Mon … 6=Sat
+  const daysBack = dow === 0 ? 6 : dow - 1
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysBack)
+  ).toISOString()
+}
+
+async function postToSlack(token: string, message: object): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(message),
+  })
+  return res.json() as Promise<{ ok: boolean; error?: string }>
 }
 
 const STAGE_EMOJI: Record<string, string> = {
@@ -52,10 +78,254 @@ const STAGE_SUGGESTION: Record<string, string> = {
   Conversion:    'New promo/offer-led video with clear CTA',
 }
 
-// ─── Handler ─────────────────────────────────────────────────────────────────
+const STAGES = ['Awareness', 'Consideration', 'Conversion']
+
+// ─── Monday: Full weekly alert ───────────────────────────────────────────────
+
+async function runMondayAlert(
+  supabase: ReturnType<typeof createServerClient>,
+  channelId: string,
+  appUrl: string,
+  token: string
+) {
+  const { data: assets, error } = await supabase
+    .from('assets')
+    .select(`
+      id, status, stage, content_type, date_added, date_live, client_id, product_id,
+      product:products(name),
+      client:clients(id, name, slug)
+    `)
+    .in('status', ['Live / Running', 'Needs Refresh / Missing'])
+
+  if (error) {
+    console.error('[freshness/monday] query error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const needsAlert = (assets ?? []).filter(a => {
+    const d = getRelevantDate(a)
+    return d ? daysSince(d) >= REFRESH_SOON_DAYS : false
+  })
+
+  if (!needsAlert.length) {
+    return NextResponse.json({ ok: true, run: 'monday', alerted: 0, message: 'Nothing in Refresh Soon range' })
+  }
+
+  // Group by client
+  const byClient = new Map<string, typeof needsAlert>()
+  for (const a of needsAlert) {
+    if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
+    byClient.get(a.client_id)!.push(a)
+  }
+
+  let totalAlerted = 0
+
+  for (const [, clientAssets] of byClient) {
+    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
+    if (!client) continue
+
+    const count = clientAssets.length
+    const sorted = [...clientAssets].sort((a, b) =>
+      daysSince(getRelevantDate(b) ?? '') - daysSince(getRelevantDate(a) ?? '')
+    )
+
+    // One section block per stage (avoids Slack's 3000-char section limit)
+    const stageBlocks = STAGES.flatMap(stage => {
+      const stageAssets = sorted.filter(a => a.stage === stage)
+      if (!stageAssets.length) return []
+
+      const lines = stageAssets.map(a => {
+        const days    = daysSince(getRelevantDate(a) ?? '')
+        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
+        const type    = a.content_type ?? 'Unknown type'
+        return `    › ${product} — ${type} — *${days} days* live`
+      })
+
+      return [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}\n    _Ask: ${STAGE_SUGGESTION[stage] ?? ''}_`,
+          },
+        },
+      ]
+    })
+
+    const message = {
+      channel: channelId,
+      text: `📋 This Week's Content Needs — ${client.name}`,
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: `📋 This Week's Content Needs — ${client.name}`, emoji: true },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*${count} asset${count !== 1 ? 's' : ''}* hitting Refresh Soon (${REFRESH_SOON_DAYS}+ days live). Get new creative in the pipeline this week.`,
+          },
+        },
+        ...stageBlocks,
+        { type: 'divider' },
+        {
+          type: 'actions',
+          elements: [{
+            type: 'button',
+            style: 'primary',
+            text: { type: 'plain_text', text: `View ${client.name} Dashboard →`, emoji: true },
+            url: `${appUrl}/${client.slug}`,
+          }],
+        },
+      ],
+    }
+
+    const result = await postToSlack(token, message)
+    if (!result.ok) {
+      console.error(`[freshness/monday] Slack error for ${client.name}:`, result.error)
+      continue
+    }
+
+    // Stamp so Thursday knows this week's baseline
+    await supabase
+      .from('assets')
+      .update({ refresh_notified_at: new Date().toISOString() })
+      .in('id', clientAssets.map(a => a.id))
+
+    totalAlerted += count
+  }
+
+  return NextResponse.json({ ok: true, run: 'monday', alerted: totalAlerted })
+}
+
+// ─── Thursday: Progress check ────────────────────────────────────────────────
+
+async function runThursdayAlert(
+  supabase: ReturnType<typeof createServerClient>,
+  channelId: string,
+  appUrl: string,
+  token: string
+) {
+  const lastMonday = getMostRecentMonday()
+
+  // All assets from Monday's batch (by refresh_notified_at, regardless of current status)
+  const { data: mondayAssets, error } = await supabase
+    .from('assets')
+    .select(`
+      id, status, stage, content_type, date_added, date_live, client_id, product_id,
+      product:products(name),
+      client:clients(id, name, slug)
+    `)
+    .gte('refresh_notified_at', lastMonday)
+
+  if (error) {
+    console.error('[freshness/thursday] query error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (!mondayAssets?.length) {
+    return NextResponse.json({ ok: true, run: 'thursday', message: 'No assets from Monday alert — run Monday first' })
+  }
+
+  // New Slack-submitted content delivered since Monday (client:product:stage combos)
+  const { data: newContent } = await supabase
+    .from('assets')
+    .select('client_id, product_id, stage')
+    .not('slack_message_ts', 'is', null)
+    .gte('created_at', lastMonday)
+
+  const deliveredThisWeek = new Set(
+    (newContent ?? []).map(a => `${a.client_id}:${a.product_id}:${a.stage}`)
+  )
+
+  const isCompleted = (a: typeof mondayAssets[0]) => {
+    if (a.status === 'Pulled' || a.status === 'Removed by Request') return true
+    return deliveredThisWeek.has(`${a.client_id}:${a.product_id}:${a.stage}`)
+  }
+
+  // Group by client
+  const byClient = new Map<string, typeof mondayAssets>()
+  for (const a of mondayAssets) {
+    if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
+    byClient.get(a.client_id)!.push(a)
+  }
+
+  let clientsPosted = 0
+
+  for (const [, clientAssets] of byClient) {
+    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
+    if (!client) continue
+
+    const remaining  = clientAssets.filter(a => !isCompleted(a))
+    const completed  = clientAssets.filter(a => isCompleted(a))
+
+    const stageBlocks = STAGES.flatMap(stage => {
+      const stageAssets = clientAssets.filter(a => a.stage === stage)
+      if (!stageAssets.length) return []
+
+      const lines = stageAssets.map(a => {
+        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
+        const type    = a.content_type ?? 'Unknown type'
+        const days    = daysSince(getRelevantDate(a) ?? '')
+        return isCompleted(a)
+          ? `    ~› ${product} — ${type}~`
+          : `    *› ${product} — ${type} — ${days} days live*`
+      })
+
+      return [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}` },
+        },
+      ]
+    })
+
+    const summaryText = remaining.length === 0
+      ? `✅ All ${completed.length} assets addressed this week — great work!`
+      : `*${remaining.length} still outstanding* · ${completed.length} completed this week`
+
+    const message = {
+      channel: channelId,
+      text: `📌 Remaining Content Needs — ${client.name}`,
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: `📌 Remaining Content Needs — ${client.name}`, emoji: true },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: summaryText },
+        },
+        ...stageBlocks,
+        { type: 'divider' },
+        {
+          type: 'actions',
+          elements: [{
+            type: 'button',
+            style: 'primary',
+            text: { type: 'plain_text', text: `View ${client.name} Dashboard →`, emoji: true },
+            url: `${appUrl}/${client.slug}`,
+          }],
+        },
+      ],
+    }
+
+    const result = await postToSlack(token, message)
+    if (!result.ok) {
+      console.error(`[freshness/thursday] Slack error for ${client.name}:`, result.error)
+      continue
+    }
+
+    clientsPosted++
+  }
+
+  return NextResponse.json({ ok: true, run: 'thursday', clients_posted: clientsPosted })
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  // Verify caller (Vercel cron sets Authorization: Bearer <CRON_SECRET>)
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -66,146 +336,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'SLACK_ASSET_NEEDS_CHANNEL_ID not configured' }, { status: 500 })
   }
 
+  const token  = process.env.SLACK_BOT_TOKEN ?? ''
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
+
+  // ?run=monday or ?run=thursday overrides day detection for manual testing
+  const runOverride = req.nextUrl.searchParams.get('run')
+  const dow         = new Date().getUTCDay() // 0=Sun 1=Mon … 4=Thu
+  const isMonday    = runOverride === 'monday'   || (!runOverride && dow === 1)
+  const isThursday  = runOverride === 'thursday' || (!runOverride && dow === 4)
+
+  if (!isMonday && !isThursday) {
+    return NextResponse.json({ ok: true, skipped: true, message: 'Only runs Monday and Thursday — use ?run=monday or ?run=thursday to test' })
+  }
+
   const supabase = createServerClient()
 
-  // Fetch assets not yet notified, in eligible statuses, with product + client data
-  const { data: assets, error } = await supabase
-    .from('assets')
-    .select(`
-      id, status, stage, content_type, date_added, date_live, client_id,
-      product:products(name),
-      client:clients(id, name, slug)
-    `)
-    .in('status', ['Live / Running', 'Needs Refresh / Missing'])
-    .is('refresh_notified_at', null)
-
-  if (error) {
-    console.error('[freshness-check] query error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Filter to assets that have crossed the Refresh Soon threshold
-  const needsAlert = (assets ?? []).filter(asset => {
-    const dateStr = getRelevantDate(asset)
-    return dateStr ? daysSince(dateStr) >= REFRESH_SOON_DAYS : false
-  })
-
-  if (!needsAlert.length) {
-    return NextResponse.json({ ok: true, alerted: 0, message: 'Nothing new in Refresh Soon' })
-  }
-
-  // Group by client
-  const byClient = new Map<string, typeof needsAlert>()
-  for (const asset of needsAlert) {
-    const key = asset.client_id
-    if (!byClient.has(key)) byClient.set(key, [])
-    byClient.get(key)!.push(asset)
-  }
-
-  const token = process.env.SLACK_BOT_TOKEN
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
-  let totalAlerted = 0
-
-  for (const [, clientAssets] of byClient) {
-    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
-    if (!client) continue
-
-    // Sort by days live descending (most urgent first)
-    const sorted = [...clientAssets].sort((a, b) => {
-      const da = getRelevantDate(a) ?? ''
-      const db = getRelevantDate(b) ?? ''
-      return daysSince(db) - daysSince(da)
-    })
-
-    // Build asset lines grouped by stage
-    const stages = ['Awareness', 'Consideration', 'Conversion']
-    const stageBlocks: string[] = []
-
-    for (const stage of stages) {
-      const stageAssets = sorted.filter(a => a.stage === stage)
-      if (!stageAssets.length) continue
-
-      const emoji = STAGE_EMOJI[stage] ?? '•'
-      const suggestion = STAGE_SUGGESTION[stage] ?? ''
-      const lines = stageAssets.map(a => {
-        const days = daysSince(getRelevantDate(a) ?? '')
-        const type = a.content_type ?? 'Unknown type'
-        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
-        return `    › ${product} — ${type} — *${days} days* live`
-      })
-
-      stageBlocks.push(
-        `${emoji} *${stage}*\n${lines.join('\n')}\n    _Ask: ${suggestion}_`
-      )
-    }
-
-    const bodyText = stageBlocks.join('\n\n')
-
-    const message = {
-      channel: channelId,
-      text: `🔄 Refresh alert for ${client.name} — creative needed`,
-      blocks: [
-        {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: `🔄 Refresh Alert — ${client.name}`,
-            emoji: true,
-          },
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `These assets have hit *Refresh Soon* (${REFRESH_SOON_DAYS}+ days live). New creative should be in the pipeline *now* to avoid fatigue.`,
-          },
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: bodyText,
-          },
-        },
-        { type: 'divider' },
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              style: 'primary',
-              text: { type: 'plain_text', text: `View ${client.name} Missing Coverage →`, emoji: true },
-              url: `${appUrl}/${client.slug}`,
-            },
-          ],
-        },
-      ],
-    }
-
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
-    })
-
-    const slackData = await res.json() as { ok: boolean; error?: string }
-    if (!slackData.ok) {
-      console.error(`[freshness-check] Slack error for ${client.name}:`, slackData.error)
-      continue
-    }
-
-    // Mark assets as notified so they don't alert again
-    const ids = clientAssets.map(a => a.id)
-    await supabase
-      .from('assets')
-      .update({ refresh_notified_at: new Date().toISOString() })
-      .in('id', ids)
-
-    totalAlerted += ids.length
-  }
-
-  return NextResponse.json({ ok: true, alerted: totalAlerted })
+  return isMonday
+    ? runMondayAlert(supabase, channelId, appUrl, token)
+    : runThursdayAlert(supabase, channelId, appUrl, token)
 }
