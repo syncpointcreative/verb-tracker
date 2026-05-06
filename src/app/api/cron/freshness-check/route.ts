@@ -30,9 +30,14 @@ function getRelevantDate(asset: {
 }
 
 function daysSince(dateStr: string): number {
-  return Math.floor(
-    (Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24)
-  )
+  // Compare whole UTC calendar days so the 9am cron reliably catches
+  // assets that crossed the threshold overnight. The noon anchor would
+  // push the trigger point to noon UTC — 3 hours past the cron window.
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const then = Date.UTC(year, month - 1, day)
+  const now = new Date()
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  return Math.floor((today - then) / (1000 * 60 * 60 * 24))
 }
 
 const STAGE_EMOJI: Record<string, string> = {
