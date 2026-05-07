@@ -10,6 +10,7 @@ interface ClientProduct { id: string; name: string; sort_order: number }
 
 interface PendingChange {
   product_id?:   string
+  stage?:        string
   content_type?: string | null
   posted_by?:    string | null
 }
@@ -169,6 +170,27 @@ export default function AssetTable({ assets, products }: Props) {
 
   const handleCancel = () => { setPending({}); setEditMode(false) }
 
+  // ── Instant status change (no edit mode required) ────────────────────────
+  const [quickSaving, setQuickSaving] = useState<string | null>(null)
+
+  const handleQuickStatus = async (assetId: string, newStatus: string) => {
+    setQuickSaving(assetId + newStatus)
+    const body: Record<string, string> = { status: newStatus }
+    if (newStatus === 'Live / Running') {
+      body.date_live = new Date().toISOString().split('T')[0]
+    }
+    // Optimistic update so the UI responds immediately
+    setLocalAssets(prev => prev.map(a =>
+      a.id === assetId ? { ...a, status: newStatus as Asset['status'], ...(body.date_live ? { date_live: body.date_live } : {}) } : a
+    ))
+    await fetch(`/api/assets?id=${assetId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    })
+    setQuickSaving(null)
+  }
+
   const handleSave = async () => {
     const entries = Object.entries(pending)
     if (!entries.length) { setEditMode(false); return }
@@ -185,7 +207,7 @@ export default function AssetTable({ assets, products }: Props) {
     setLocalAssets(prev => prev.map(a => {
       const change = pending[a.id]
       if (!change) return a
-      const updated = { ...a, ...change }
+      const updated = { ...a, ...change, stage: (change.stage ?? a.stage) as Asset['stage'] }
       if (change.product_id) {
         const prod = products.find(p => p.id === change.product_id)
         if (prod) updated.product = prod as unknown as Product
@@ -327,6 +349,7 @@ export default function AssetTable({ assets, products }: Props) {
                       <th className="text-left px-3 py-2 w-28">Posted By</th>
                       <th className="text-left px-3 py-2 w-24">Freshness</th>
                       <th className="text-left px-3 py-2">Notes</th>
+                      <th className="px-3 py-2 w-28"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -334,8 +357,10 @@ export default function AssetTable({ assets, products }: Props) {
                       const statusCfg = STATUS_CONFIG[asset.status]
                       const change    = pending[asset.id] ?? {}
                       const curProdId = change.product_id   ?? asset.product_id
+                      const curStage  = change.stage        ?? asset.stage
                       const curType   = change.content_type !== undefined ? change.content_type : asset.content_type
                       const curBy     = change.posted_by    !== undefined ? change.posted_by    : asset.posted_by
+                      const isQuickSaving = quickSaving?.startsWith(asset.id)
                       return (
                         <tr key={asset.id} className={`${i % 2 === 0 ? 'bg-white' : cfg.rowBg} hover:bg-gray-50`}>
 
@@ -406,6 +431,38 @@ export default function AssetTable({ assets, products }: Props) {
 
                           {/* Notes */}
                           <td className="px-3 py-2"><NotesCell value={asset.notes} assetId={asset.id} /></td>
+
+                          {/* Quick actions */}
+                          <td className="px-3 py-2">
+                            {editMode ? (
+                              // Stage override lives here in edit mode to keep the row compact
+                              <select
+                                value={curStage}
+                                onChange={e => setPendingField(asset.id, 'stage', e.target.value)}
+                                className="w-full border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              >
+                                {['Awareness', 'Consideration', 'Conversion'].map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            ) : asset.status === 'Ready to Upload' ? (
+                              <button
+                                onClick={() => handleQuickStatus(asset.id, 'Live / Running')}
+                                disabled={isQuickSaving}
+                                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-40 whitespace-nowrap"
+                              >
+                                {isQuickSaving ? '…' : '↑ Mark Live'}
+                              </button>
+                            ) : asset.status === 'Live / Running' ? (
+                              <button
+                                onClick={() => handleQuickStatus(asset.id, 'Pulled')}
+                                disabled={isQuickSaving}
+                                className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 whitespace-nowrap"
+                              >
+                                {isQuickSaving ? '…' : 'Pull'}
+                              </button>
+                            ) : null}
+                          </td>
                         </tr>
                       )
                     })}
