@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-dark:  #2B3428;
+    --color-stone: #F2EDE7;
+    --color-gold:  #C4A263;
+    --color-cream: #F5F1EB;
+  }
+
+  /* Ensure Cormorant Garamond is used by .font-serif */
+  .font-serif {
+    font-family: var(--font-serif), 'Georgia', serif;
+  }
+
+  .font-sans {
+    font-family: var(--font-sans), 'Inter', sans-serif;
+  }
+}

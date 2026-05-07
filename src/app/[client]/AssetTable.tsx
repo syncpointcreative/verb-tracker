@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { STAGE_CONFIG, STAGES, STATUS_CONFIG } from '@/lib/constants'
+import { STAGES, STATUS_CONFIG } from '@/lib/constants'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,22 +29,65 @@ const STATUS_TRANSITIONS: Partial<Record<AssetStatus, AssetStatus[]>> = {
   'Removed by Request':      ['Ready to Upload'],
 }
 
+// Stage config — dark charcoal headers, warm tinted content areas
+const STAGE_STYLE: Record<Stage, {
+  headerBg:    string
+  accentColor: string
+  accentBg:    string   // bg equivalent of accentColor, declared explicitly for Tailwind scanning
+  accentLabel: string
+  lightBg:     string
+  rowBg:       string
+  border:      string
+  description: string
+}> = {
+  Awareness: {
+    headerBg:    'bg-[#2B3428]',
+    accentColor: 'text-rose-300',
+    accentBg:    'bg-rose-300',
+    accentLabel: 'Awareness',
+    lightBg:     'bg-rose-50/40',
+    rowBg:       'bg-rose-50/20',
+    border:      'border-rose-100',
+    description: 'Stop the scroll. Introduce the brand.',
+  },
+  Consideration: {
+    headerBg:    'bg-[#2B3428]',
+    accentColor: 'text-amber-300',
+    accentBg:    'bg-amber-300',
+    accentLabel: 'Consideration',
+    lightBg:     'bg-amber-50/40',
+    rowBg:       'bg-amber-50/20',
+    border:      'border-amber-100',
+    description: 'Educate. Build desire. Differentiate.',
+  },
+  Conversion: {
+    headerBg:    'bg-[#2B3428]',
+    accentColor: 'text-emerald-300',
+    accentBg:    'bg-emerald-300',
+    accentLabel: 'Conversion',
+    lightBg:     'bg-emerald-50/40',
+    rowBg:       'bg-emerald-50/20',
+    border:      'border-emerald-100',
+    description: 'Drive the click. Close the sale.',
+  },
+}
+
 // ─── Freshness meter ──────────────────────────────────────────────────────────
 
 const FRESHNESS = [
-  { maxDays: 7,        label: 'Fresh',        bar: 'bg-green-400',  text: 'text-green-700',  track: 'bg-green-100'  },
-  { maxDays: 14,       label: 'Monitor',      bar: 'bg-yellow-400', text: 'text-yellow-700', track: 'bg-yellow-100' },
-  { maxDays: 21,       label: 'Refresh Soon', bar: 'bg-orange-400', text: 'text-orange-700', track: 'bg-orange-100' },
-  { maxDays: 30,       label: 'Stale',        bar: 'bg-red-400',    text: 'text-red-700',    track: 'bg-red-100'    },
-  { maxDays: Infinity, label: 'Expired',      bar: 'bg-gray-400',   text: 'text-gray-500',   track: 'bg-gray-100'   },
+  { maxDays: 7,        label: 'Fresh',        bar: 'bg-emerald-400', text: 'text-emerald-700', track: 'bg-emerald-100' },
+  { maxDays: 14,       label: 'Monitor',      bar: 'bg-yellow-400',  text: 'text-yellow-700',  track: 'bg-yellow-100'  },
+  { maxDays: 21,       label: 'Refresh Soon', bar: 'bg-orange-400',  text: 'text-orange-700',  track: 'bg-orange-100'  },
+  { maxDays: 30,       label: 'Stale',        bar: 'bg-red-400',     text: 'text-red-700',     track: 'bg-red-100'     },
+  { maxDays: Infinity, label: 'Expired',      bar: 'bg-stone-400',   text: 'text-stone-500',   track: 'bg-stone-100'   },
 ]
 
 function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
   if (status === 'Pulled' || status === 'Removed by Request' || status === 'Pending Review') {
-    return <span className="text-gray-400 text-xs">—</span>
+    return <span className="text-stone-300 text-xs">—</span>
   }
   if (status === 'Ready to Upload' || !dateLive) {
-    return <span className="text-gray-300 text-xs">Not live</span>
+    return <span className="text-stone-300 text-xs">Not live</span>
   }
   const days = Math.floor((Date.now() - new Date(dateLive + 'T12:00:00').getTime()) / 86_400_000)
   const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[FRESHNESS.length - 1]
@@ -53,7 +96,7 @@ function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status:
     <div className="flex flex-col gap-0.5 min-w-[80px]">
       <div className="flex items-center justify-between gap-1">
         <span className={`text-[10px] font-semibold ${tier.text}`}>{tier.label}</span>
-        <span className="text-[10px] text-gray-400">{days}d</span>
+        <span className="text-[10px] text-stone-400">{days}d</span>
       </div>
       <div className={`h-1 rounded-full ${tier.track} overflow-hidden`}>
         <div className={`h-full rounded-full ${tier.bar}`} style={{ width: `${pct}%` }} />
@@ -85,17 +128,14 @@ function NotesCell({ value, assetId }: { value: string | null; assetId: string }
       onBlur={save}
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
       placeholder="Add a note…" disabled={saving}
-      className="w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none px-0 py-0.5 text-xs text-gray-600 placeholder-gray-300 disabled:opacity-50"
+      className="w-full bg-transparent border-b border-transparent hover:border-stone-200 focus:border-[#C4A263] focus:outline-none px-0 py-0.5 text-xs text-stone-600 placeholder-stone-300 disabled:opacity-50 transition-colors"
     />
   )
 }
 
 // ─── Inline status dropdown ───────────────────────────────────────────────────
 
-function StatusDropdown({
-  asset,
-  onStatusChange,
-}: {
+function StatusDropdown({ asset, onStatusChange }: {
   asset: Asset
   onStatusChange: (assetId: string, newStatus: AssetStatus) => Promise<void>
 }) {
@@ -128,15 +168,15 @@ function StatusDropdown({
         onClick={() => !saving && next.length > 0 && setOpen(o => !o)}
         disabled={saving || next.length === 0}
         title={next.length > 0 ? 'Click to change status' : undefined}
-        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text} ${next.length > 0 ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} disabled:opacity-60`}
+        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text} ${next.length > 0 ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} disabled:opacity-60 transition-opacity`}
       >
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
         {saving ? '…' : asset.status}
-        {next.length > 0 && !saving && <span className="ml-0.5 opacity-50">▾</span>}
+        {next.length > 0 && !saving && <span className="ml-0.5 opacity-40">▾</span>}
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]">
+        <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-stone-200 rounded-lg shadow-lg py-1 min-w-[160px]">
           {next.map(s => {
             const c = STATUS_CONFIG[s]
             const isMarkLive = s === 'Live / Running'
@@ -144,10 +184,10 @@ function StatusDropdown({
               <button
                 key={s}
                 onClick={() => handleSelect(s)}
-                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isMarkLive ? 'font-semibold' : ''}`}
+                className="w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-stone-50 transition-colors"
               >
                 <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
-                <span className={isMarkLive ? 'text-green-700' : 'text-gray-700'}>
+                <span className={isMarkLive ? 'text-emerald-700 font-semibold' : 'text-stone-700'}>
                   {isMarkLive ? '↑ Mark Live' : s}
                 </span>
               </button>
@@ -172,18 +212,17 @@ const CONTENT_TYPES = [
   'Static Imagery', 'Motion Graphics', 'Affiliate Video',
 ]
 
-const ALL_STATUSES: AssetStatus[] = ['Pending Review', 'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
+// Input / select styles
+const selectCls = "border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40 focus:border-[#C4A263]"
+const activeSelectCls = "border-[#C4A263] rounded-lg px-2.5 py-1.5 text-sm text-[#2B3428] bg-amber-50 focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40"
 
-const selectCls = "border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-const activeSelectCls = "border-blue-400 ring-1 ring-blue-300 rounded-lg px-2.5 py-1.5 text-sm text-blue-700 bg-blue-50 focus:outline-none"
-
-// Status summary pill colours
-const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: string; dot: string }[] = [
-  { status: 'Pending Review',          label: 'Pending',      bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-400' },
-  { status: 'Ready to Upload',         label: 'Ready',        bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-400'   },
-  { status: 'Live / Running',          label: 'Live',         bg: 'bg-green-100',  text: 'text-green-800',  dot: 'bg-green-400'  },
-  { status: 'Needs Refresh / Missing', label: 'Needs Refresh',bg: 'bg-amber-100',  text: 'text-amber-800',  dot: 'bg-amber-400'  },
-  { status: 'Expired',                 label: 'Expired',      bg: 'bg-gray-100',   text: 'text-gray-600',   dot: 'bg-gray-400'   },
+// Status summary strip
+const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: string; dot: string; activeBg: string }[] = [
+  { status: 'Pending Review',          label: 'Pending',       bg: 'bg-violet-100',  text: 'text-violet-700', dot: 'bg-violet-400',  activeBg: 'bg-violet-200'  },
+  { status: 'Ready to Upload',         label: 'Ready',         bg: 'bg-blue-100',    text: 'text-blue-700',   dot: 'bg-blue-400',    activeBg: 'bg-blue-200'    },
+  { status: 'Live / Running',          label: 'Live',          bg: 'bg-emerald-100', text: 'text-emerald-700',dot: 'bg-emerald-400', activeBg: 'bg-emerald-200' },
+  { status: 'Needs Refresh / Missing', label: 'Needs Refresh', bg: 'bg-amber-100',   text: 'text-amber-700',  dot: 'bg-amber-400',   activeBg: 'bg-amber-200'   },
+  { status: 'Expired',                 label: 'Expired',       bg: 'bg-stone-100',   text: 'text-stone-500',  dot: 'bg-stone-400',   activeBg: 'bg-stone-200'   },
 ]
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -206,7 +245,6 @@ export default function AssetTable({ assets, products }: Props) {
   const [selectedContentType,  setSelectedContentType]  = useState<string>('')
   const [dateSort,             setDateSort]             = useState<'desc' | 'asc'>('desc')
 
-  // Collapsed state per stage
   const [collapsed, setCollapsed] = useState<Record<Stage, boolean>>({
     Awareness: false, Consideration: false, Conversion: false,
   })
@@ -221,12 +259,9 @@ export default function AssetTable({ assets, products }: Props) {
     [...new Set(localAssets.map(a => a.content_type).filter(Boolean) as string[])].sort()
   , [localAssets])
 
-  // Status counts for the summary strip (unfiltered)
   const statusCounts = useMemo(() => {
     const counts: Partial<Record<AssetStatus, number>> = {}
-    for (const a of localAssets) {
-      counts[a.status] = (counts[a.status] ?? 0) + 1
-    }
+    for (const a of localAssets) counts[a.status] = (counts[a.status] ?? 0) + 1
     return counts
   }, [localAssets])
 
@@ -238,13 +273,11 @@ export default function AssetTable({ assets, products }: Props) {
     if (selectedStatus)      result = result.filter(a => a.status === selectedStatus)
     if (selectedContentType) result = result.filter(a => a.content_type === selectedContentType)
     return [...result].sort((a, b) => {
-      const da = a.date_added ?? ''
-      const db = b.date_added ?? ''
+      const da = a.date_added ?? ''; const db = b.date_added ?? ''
       return dateSort === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
     })
   }, [localAssets, searchQuery, selectedProductId, selectedCreator, selectedStatus, selectedContentType, dateSort])
 
-  // Split: pending review queue vs active assets
   const pendingReview = filteredAssets.filter(a => a.status === 'Pending Review')
   const activeAssets  = filteredAssets.filter(a => ACTIVE_STATUSES.includes(a.status))
 
@@ -296,16 +329,11 @@ export default function AssetTable({ assets, products }: Props) {
     setTimeout(() => setSavedMsg(false), 2500)
   }
 
-  // ── Inline status change ─────────────────────────────────────────────────────
   const handleStatusChange = async (assetId: string, newStatus: AssetStatus) => {
     const body: Record<string, string> = { status: newStatus }
-    if (newStatus === 'Live / Running') {
-      body.date_live = new Date().toISOString().split('T')[0]
-    }
+    if (newStatus === 'Live / Running') body.date_live = new Date().toISOString().split('T')[0]
     setLocalAssets(prev => prev.map(a =>
-      a.id === assetId
-        ? { ...a, status: newStatus, ...(body.date_live ? { date_live: body.date_live } : {}) }
-        : a
+      a.id === assetId ? { ...a, status: newStatus, ...(body.date_live ? { date_live: body.date_live } : {}) } : a
     ))
     await fetch(`/api/assets?id=${assetId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -321,78 +349,80 @@ export default function AssetTable({ assets, products }: Props) {
     const curType   = change.content_type !== undefined ? change.content_type : asset.content_type
     const curBy     = change.posted_by    !== undefined ? change.posted_by    : asset.posted_by
     return (
-      <tr key={asset.id} className={`${i % 2 === 0 ? 'bg-white' : rowBg} hover:bg-gray-50 group`}>
+      <tr key={asset.id} className={`${i % 2 === 0 ? 'bg-white' : rowBg} hover:bg-stone-50/80 group transition-colors`}>
 
         {/* Product */}
-        <td className="px-3 py-1.5">
+        <td className="px-3 py-2">
           {editMode ? (
             <select value={curProdId ?? ''} onChange={e => setPendingField(asset.id, 'product_id', e.target.value)}
-              className="w-full border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+              className="w-full border border-stone-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           ) : (
-            <span className="text-gray-500 text-xs">{(asset.product as Product)?.name ?? '—'}</span>
+            <span className="text-stone-400 text-xs">{(asset.product as Product)?.name ?? '—'}</span>
           )}
         </td>
 
         {/* Asset Name + content type stacked */}
-        <td className="px-3 py-1.5">
-          <div className="font-medium text-sm text-gray-900 leading-tight">{asset.asset_name}</div>
+        <td className="px-3 py-2">
+          <div className="font-medium text-sm text-stone-900 leading-tight">{asset.asset_name}</div>
           {editMode ? (
             <select value={curType ?? ''} onChange={e => setPendingField(asset.id, 'content_type', e.target.value || null)}
-              className="mt-1 w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+              className="mt-1 w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
               <option value="">—</option>
               {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           ) : (
-            <div className="text-xs text-gray-400 mt-0.5">{asset.content_type ?? '—'}</div>
+            <div className="text-xs text-stone-400 mt-0.5">{asset.content_type ?? '—'}</div>
           )}
         </td>
 
-        {/* Status — click to change */}
-        <td className="px-3 py-1.5">
+        {/* Status */}
+        <td className="px-3 py-2">
           <StatusDropdown asset={asset} onStatusChange={handleStatusChange} />
         </td>
 
         {/* Date */}
-        <td className="px-3 py-1.5 text-gray-400 text-xs whitespace-nowrap">{fmt(asset.date_added)}</td>
+        <td className="px-3 py-2 text-stone-400 text-xs whitespace-nowrap">{fmt(asset.date_added)}</td>
 
-        {/* Posted By */}
-        <td className="px-3 py-1.5">
+        {/* Creator */}
+        <td className="px-3 py-2">
           {editMode ? (
             <input type="text" value={curBy ?? ''} onChange={e => setPendingField(asset.id, 'posted_by', e.target.value || null)}
               placeholder="Creator"
-              className="w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]" />
           ) : (
-            <span className="text-gray-400 text-xs">{asset.posted_by ?? '—'}</span>
+            <span className="text-stone-400 text-xs">{asset.posted_by ?? '—'}</span>
           )}
         </td>
 
         {/* Freshness */}
-        <td className="px-3 py-1.5"><FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} /></td>
+        <td className="px-3 py-2"><FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} /></td>
 
         {/* Stage (edit mode only) */}
         {editMode && (
-          <td className="px-3 py-1.5">
+          <td className="px-3 py-2">
             <select value={curStage} onChange={e => setPendingField(asset.id, 'stage', e.target.value)}
-              className="w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
               {['Awareness', 'Consideration', 'Conversion'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </td>
         )}
 
         {/* Notes */}
-        <td className="px-3 py-1.5"><NotesCell value={asset.notes} assetId={asset.id} /></td>
+        <td className="px-3 py-2"><NotesCell value={asset.notes} assetId={asset.id} /></td>
       </tr>
     )
   }
+
+  const thCls = "text-left px-3 py-2 text-[10px] font-semibold text-stone-400 uppercase tracking-[0.1em]"
 
   return (
     <div>
 
       {/* ── Status summary strip ── */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {STATUS_STRIP.map(({ status, label, bg, text, dot }) => {
+        {STATUS_STRIP.map(({ status, label, bg, text, dot, activeBg }) => {
           const count = statusCounts[status] ?? 0
           if (count === 0) return null
           const isActive = selectedStatus === status
@@ -402,7 +432,7 @@ export default function AssetTable({ assets, products }: Props) {
               onClick={() => setSelectedStatus(isActive ? '' : status)}
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
                 isActive
-                  ? `${bg} ${text} border-current opacity-100 ring-2 ring-offset-1 ring-current`
+                  ? `${activeBg} ${text} border-current ring-2 ring-offset-1 ring-current`
                   : `${bg} ${text} border-transparent hover:opacity-90`
               }`}
             >
@@ -412,7 +442,7 @@ export default function AssetTable({ assets, products }: Props) {
           )
         })}
         {selectedStatus && (
-          <button onClick={() => setSelectedStatus('')} className="text-xs text-gray-400 hover:text-gray-600 px-1">
+          <button onClick={() => setSelectedStatus('')} className="text-xs text-stone-400 hover:text-stone-600 px-1 transition-colors">
             ✕ clear
           </button>
         )}
@@ -422,7 +452,7 @@ export default function AssetTable({ assets, products }: Props) {
       <div className="flex flex-wrap items-center gap-2 mb-5">
         {/* Search */}
         <div className="relative">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
@@ -430,7 +460,7 @@ export default function AssetTable({ assets, products }: Props) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search assets…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 w-48"
+            className="pl-8 pr-3 py-1.5 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40 focus:border-[#C4A263] w-48 transition-colors placeholder:text-stone-300"
           />
         </div>
 
@@ -452,26 +482,28 @@ export default function AssetTable({ assets, products }: Props) {
           {contentTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         {activeFilterCount > 0 && (
-          <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">
+          <button onClick={clearFilters} className="text-xs text-stone-500 hover:text-stone-700 underline transition-colors">
             Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
           </button>
         )}
+
+        {/* Edit controls */}
         <div className="flex items-center gap-2 ml-auto">
-          {savedMsg && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
+          {savedMsg && <span className="text-xs text-emerald-600 font-medium">Saved ✓</span>}
           {editMode ? (
             <>
               <button onClick={handleCancel} disabled={saving}
-                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+                className="text-sm text-stone-500 hover:text-stone-700 px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 disabled:opacity-50 transition-colors">
                 Cancel
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-lg disabled:opacity-50">
+                className="text-sm font-medium text-white bg-[#2B3428] hover:bg-[#3a4636] px-4 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
                 {saving ? 'Saving…' : `Save${Object.keys(pending).length ? ` (${Object.keys(pending).length})` : ''}`}
               </button>
             </>
           ) : (
             <button onClick={() => setEditMode(true)}
-              className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">
+              className="text-sm text-[#2B3428] hover:text-[#C4A263] px-3 py-1.5 rounded-lg border border-stone-200 hover:border-[#C4A263] bg-white transition-colors">
               ✎ Edit
             </button>
           )}
@@ -481,53 +513,62 @@ export default function AssetTable({ assets, products }: Props) {
       {/* ── Pending Review queue ── */}
       {pendingReview.length > 0 && (
         <div className="mb-5">
-          <div className="bg-violet-50 border border-violet-200 rounded-t-lg px-4 py-2.5 flex items-center justify-between">
-            <div>
-              <span className="font-semibold text-violet-900">Pending Review</span>
-              <span className="ml-2 text-xs text-violet-500">awaiting Libby&apos;s ✅ or ❌ in Slack</span>
+          <div className="bg-[#2B3428] px-4 py-3 rounded-t-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-px bg-violet-400" />
+              <span className="text-[10px] tracking-[0.16em] text-violet-300 uppercase font-medium">Pending Review</span>
+              <span className="text-xs text-[#A8A09A]">— awaiting approval in Slack</span>
             </div>
-            <span className="text-xs text-violet-400">{pendingReview.length} asset{pendingReview.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-[#A8A09A]">{pendingReview.length} asset{pendingReview.length !== 1 ? 's' : ''}</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border border-t-0 border-violet-200 rounded-b-lg overflow-hidden">
+            <table className="w-full text-sm border border-t-0 border-stone-200 rounded-b-lg overflow-hidden bg-white">
               <thead>
-                <tr className="bg-violet-50 border-b border-violet-100 text-xs text-violet-600 uppercase tracking-wide">
-                  <th className="text-left px-3 py-2 w-28">Product</th>
-                  <th className="text-left px-3 py-2">Asset</th>
-                  <th className="text-left px-3 py-2 w-36">Status</th>
-                  <th className="text-left px-3 py-2 w-24">Date</th>
-                  <th className="text-left px-3 py-2 w-28">Creator</th>
-                  {editMode && <th className="text-left px-3 py-2 w-28">Stage</th>}
-                  <th className="text-left px-3 py-2">Notes</th>
+                <tr className="bg-violet-50/60 border-b border-stone-100">
+                  <th className={`${thCls} w-28`}>Product</th>
+                  <th className={thCls}>Asset</th>
+                  <th className={`${thCls} w-36`}>Status</th>
+                  <th className={`${thCls} w-24`}>Date</th>
+                  <th className={`${thCls} w-28`}>Creator</th>
+                  <th className={`${thCls} w-24`}>Freshness</th>
+                  {editMode && <th className={`${thCls} w-28`}>Stage</th>}
+                  <th className={thCls}>Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-violet-100">
-                {pendingReview.map((asset, i) => renderRow(asset, i, 'bg-violet-50/30'))}
+              <tbody className="divide-y divide-stone-100">
+                {pendingReview.map((asset, i) => renderRow(asset, i, 'bg-violet-50/20'))}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ── Stage tables — active assets only ── */}
+      {/* ── Stage tables ── */}
       {STAGES.map(stage => {
         const stageAssets = byStage[stage]
-        const cfg = STAGE_CONFIG[stage]
+        const s = STAGE_STYLE[stage]
         const isCollapsed = collapsed[stage]
+
         return (
           <div key={stage} className="mb-5">
-            {/* Stage header — clickable to collapse */}
+            {/* Stage header */}
             <button
               onClick={() => setCollapsed(c => ({ ...c, [stage]: !c[stage] }))}
-              className={`w-full ${cfg.headerBg} text-white px-4 py-2.5 rounded-t-lg flex items-center justify-between hover:opacity-95 transition-opacity`}
+              className={`w-full ${s.headerBg} px-5 py-3 rounded-t-lg flex items-center justify-between hover:opacity-95 transition-opacity`}
             >
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{cfg.label}</span>
-                <span className="text-xs opacity-70">— {cfg.description}</span>
+              <div className="flex items-center gap-3">
+                {/* Thin accent rule + small-caps label (ProEthical motif) */}
+                <div className={`w-6 h-px ${s.accentBg}`} />
+                <span className={`text-[10px] tracking-[0.18em] ${s.accentColor} uppercase font-medium`}>
+                  {s.accentLabel}
+                </span>
+                <span className="font-serif italic text-sm text-[#F5F1EB]/70 font-light hidden sm:inline">
+                  {s.description}
+                </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs opacity-70">{stageAssets.length} asset{stageAssets.length !== 1 ? 's' : ''}</span>
-                <span className="text-sm opacity-80 transition-transform" style={{ display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                <span className="text-[10px] text-[#A8A09A] tracking-wide">{stageAssets.length} asset{stageAssets.length !== 1 ? 's' : ''}</span>
+                <span className={`text-[#A8A09A] text-xs transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}>
                   ▾
                 </span>
               </div>
@@ -535,31 +576,33 @@ export default function AssetTable({ assets, products }: Props) {
 
             {!isCollapsed && (
               stageAssets.length === 0 ? (
-                <div className={`${cfg.lightBg} border border-t-0 ${cfg.border} rounded-b-lg px-4 py-5 text-center text-sm text-gray-400`}>
-                  {activeFilterCount > 0 ? 'No assets match the current filters' : 'No assets yet — add via Slack or manually'}
+                <div className={`${s.lightBg} border border-t-0 ${s.border} rounded-b-lg px-4 py-6 text-center`}>
+                  <p className="text-sm text-stone-400">
+                    {activeFilterCount > 0 ? 'No assets match the current filters' : 'No assets yet — add via Slack or manually'}
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
+                  <table className={`w-full text-sm border border-t-0 ${s.border} rounded-b-lg overflow-hidden`}>
                     <thead>
-                      <tr className={`${cfg.lightBg} border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide`}>
-                        <th className="text-left px-3 py-2 w-28">Product</th>
-                        <th className="text-left px-3 py-2">Asset</th>
-                        <th className="text-left px-3 py-2 w-36">Status</th>
-                        <th className="text-left px-3 py-2 w-24">
+                      <tr className={`${s.lightBg} border-b ${s.border}`}>
+                        <th className={`${thCls} w-28`}>Product</th>
+                        <th className={thCls}>Asset</th>
+                        <th className={`${thCls} w-36`}>Status</th>
+                        <th className={`${thCls} w-24`}>
                           <button onClick={() => setDateSort(d => d === 'desc' ? 'asc' : 'desc')}
-                            className="flex items-center gap-1 hover:text-gray-800 font-semibold uppercase tracking-wide" title="Toggle date sort">
-                            Date <span className="text-gray-400">{dateSort === 'desc' ? '↓' : '↑'}</span>
+                            className="flex items-center gap-1 hover:text-stone-600 uppercase tracking-[0.1em] font-semibold text-[10px]">
+                            Date <span className="text-stone-300">{dateSort === 'desc' ? '↓' : '↑'}</span>
                           </button>
                         </th>
-                        <th className="text-left px-3 py-2 w-24">Creator</th>
-                        <th className="text-left px-3 py-2 w-24">Freshness</th>
-                        {editMode && <th className="text-left px-3 py-2 w-28">Stage</th>}
-                        <th className="text-left px-3 py-2">Notes</th>
+                        <th className={`${thCls} w-24`}>Creator</th>
+                        <th className={`${thCls} w-24`}>Freshness</th>
+                        {editMode && <th className={`${thCls} w-28`}>Stage</th>}
+                        <th className={thCls}>Notes</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {stageAssets.map((asset, i) => renderRow(asset, i, cfg.rowBg))}
+                    <tbody className="divide-y divide-stone-100">
+                      {stageAssets.map((asset, i) => renderRow(asset, i, s.rowBg))}
                     </tbody>
                   </table>
                 </div>

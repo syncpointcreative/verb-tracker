@@ -79,28 +79,34 @@ export default async function ClientPage({ params }: Props) {
   return (
     <div>
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/" className="hover:text-gray-700">Dashboard</Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">{client.name}</span>
+      <div className="flex items-center gap-2 text-xs text-stone-400 mb-5 tracking-wide">
+        <Link href="/" className="hover:text-[#2B3428] transition-colors">Dashboard</Link>
+        <span className="text-stone-300">/</span>
+        <span className="text-stone-600">{client.name}</span>
       </div>
 
       {/* Client header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-end justify-between mb-7">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
+          <p className="text-[10px] tracking-[0.18em] text-[#C4A263] uppercase font-medium mb-1">Client</p>
+          <h1
+            className="font-serif text-4xl font-light tracking-wide"
+            style={{ color: client.color_hex ?? '#2B3428' }}
+          >
+            {client.name}
+          </h1>
         </div>
         {client.drive_url && (
           <a
             href={client.drive_url}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline bg-blue-50 px-3 py-1.5 rounded-lg"
+            className="flex items-center gap-1.5 text-xs text-[#C4A263] hover:text-[#D4B373] tracking-[0.12em] uppercase transition-colors border border-[#C4A263]/30 hover:border-[#C4A263] rounded-lg px-3 py-2"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            Open Drive
+            <svg className="w-3 h-3 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2.5 9.5l7-7M9.5 2.5H4M9.5 2.5V8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Open Drive Folder
           </a>
         )}
       </div>
