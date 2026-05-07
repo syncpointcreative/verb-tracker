@@ -79,6 +79,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   ISO: 'Immune Support Orange', MVOM: 'Multi-Vitamin Orange-Mango',
   JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
   CCSD: 'Chili Crunch Sushi Dip',
+  LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
 }
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',
