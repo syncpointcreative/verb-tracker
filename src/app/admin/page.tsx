@@ -18,7 +18,7 @@ interface Asset {
 }
 
 const STAGES = ['Awareness', 'Consideration', 'Conversion']
-const STATUSES = ['Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
+const STATUSES = ['Pending Review', 'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
 
 function fmt(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
@@ -32,7 +32,10 @@ export default function AdminPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [assets, setAssets]         = useState<Asset[]>([])
   const [loading, setLoading]       = useState(true)
-  const [tab, setTab]               = useState<'deliveries' | 'assets' | 'add'>('deliveries')
+  const [tab, setTab]               = useState<'deliveries' | 'assets' | 'add' | 'downloads'>('deliveries')
+  const [driveQueue, setDriveQueue] = useState<Array<{
+    id: string; file_name: string; client_name: string; status: string; created_at: string; drive_url: string | null
+  }>>([])
   const [saving, setSaving]         = useState<string | null>(null)
   const [toast, setToast]           = useState<string | null>(null)
   const [syncing, setSyncing]       = useState(false)
@@ -52,8 +55,10 @@ export default function AdminPage() {
     // Fetch clients and products from Supabase via a quick API call
     const clientRes  = await fetch('/api/clients').then(r => r.json()).catch(() => [])
     const productRes = await fetch('/api/products').then(r => r.json()).catch(() => [])
+    const queueRes = await fetch('/api/drive-queue').then(r => r.json()).catch(() => [])
     setClients(Array.isArray(clientRes) ? clientRes : [])
     setProducts(Array.isArray(productRes) ? productRes : [])
+    setDriveQueue(Array.isArray(queueRes) ? queueRes : [])
     setDeliveries(Array.isArray(d) ? d : [])
     setAssets(Array.isArray(a) ? a : [])
     setLoading(false)
@@ -196,7 +201,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {([['deliveries', 'Monthly Deliveries'], ['assets', 'Asset Status'], ['add', 'Add Asset']] as const).map(([key, label]) => (
+        {([['deliveries', 'Monthly Deliveries'], ['assets', 'Asset Status'], ['add', 'Add Asset'], ['downloads', 'Downloads']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -416,6 +421,59 @@ export default function AdminPage() {
           })}
           {assets.length === 0 && (
             <div className="text-center text-gray-400 py-12">No assets yet — add some in the Add Asset tab</div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: Downloads ───────────────────────────────────────────────────── */}
+      {tab === 'downloads' && (
+        <div>
+          <p className="text-sm text-gray-500 mb-4">
+            Assets approved by Libby (✅) — click Download to save to your machine.
+          </p>
+          {driveQueue.length === 0 ? (
+            <div className="text-center text-gray-400 py-12">No approved assets in the queue yet</div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2.5">File</th>
+                    <th className="text-left px-4 py-2.5 w-36">Client</th>
+                    <th className="text-left px-4 py-2.5 w-28">Status</th>
+                    <th className="text-left px-4 py-2.5 w-36">Queued</th>
+                    <th className="px-4 py-2.5 w-28"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {driveQueue.map(item => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{item.file_name}</td>
+                      <td className="px-4 py-2.5 text-gray-600">{item.client_name}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          item.status === 'done' ? 'bg-green-100 text-green-700' :
+                          item.status === 'error' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>{item.status}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-400 text-xs">
+                        {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <a
+                          href={`/api/download?id=${item.id}`}
+                          download={item.file_name}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100"
+                        >
+                          ↓ Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

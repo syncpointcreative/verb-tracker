@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export type Stage = 'Awareness' | 'Consideration' | 'Conversion'
-export type AssetStatus = 'Ready to Upload' | 'Live / Running' | 'Expired' | 'Needs Refresh / Missing' | 'Pulled' | 'Removed by Request'
+export type AssetStatus = 'Pending Review' | 'Ready to Upload' | 'Live / Running' | 'Expired' | 'Needs Refresh / Missing' | 'Pulled' | 'Removed by Request'
 
 export interface Client {
   id: string

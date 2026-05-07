@@ -4,21 +4,11 @@ import { useState } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 import BriefPanel from './BriefPanel'
-import { STAGE_CONFIG } from '@/lib/constants'
+import { STAGE_CONFIG, STATUS_CONFIG } from '@/lib/constants'
 import type { Stage } from '@/lib/supabase'
 
-interface BriefSection {
-  id: string
-  title: string
-  content: string
-  sort_order: number
-}
-
-interface MissingItem {
-  product: Product
-  stage: Stage
-  reason: 'aging' | 'missing'
-}
+interface BriefSection { id: string; title: string; content: string; sort_order: number }
+interface MissingItem { product: Product; stage: Stage; reason: 'aging' | 'missing' }
 
 interface Props {
   assets: Asset[]
@@ -27,14 +17,17 @@ interface Props {
   missingCoverage: MissingItem[]
 }
 
+const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
+
 export default function ClientTabs({ assets, products, briefSections, missingCoverage }: Props) {
-  const [tab, setTab] = useState<'assets' | 'brief'>('assets')
+  const [tab, setTab] = useState<'assets' | 'archive' | 'brief'>('assets')
+
+  const activeAssets  = assets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
+  const archivedAssets = assets.filter(a => ARCHIVE_STATUSES.includes(a.status))
 
   const tabCls = (active: boolean) =>
     `px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-      active
-        ? 'bg-gray-900 text-white'
-        : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+      active ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
     }`
 
   const freshSuggestions: Record<Stage, string> = {
@@ -53,8 +46,16 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
       {/* Tab bar */}
       <div className="flex gap-2 mb-6 border-b border-gray-200 pb-3">
         <button className={tabCls(tab === 'assets')} onClick={() => setTab('assets')}>
-          Assets
+          Active Assets
         </button>
+        {archivedAssets.length > 0 && (
+          <button className={tabCls(tab === 'archive')} onClick={() => setTab('archive')}>
+            Archive
+            <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+              {archivedAssets.length}
+            </span>
+          </button>
+        )}
         {briefSections.length > 0 && (
           <button className={tabCls(tab === 'brief')} onClick={() => setTab('brief')}>
             Creator Brief
@@ -62,11 +63,10 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
         )}
       </div>
 
-      {/* Assets tab */}
+      {/* Active Assets tab */}
       {tab === 'assets' && (
         <>
-          <AssetTable assets={assets} products={products} />
-
+          <AssetTable assets={activeAssets} products={products} />
           {missingCoverage.length > 0 && (
             <div className="mt-6">
               <h2 className="text-lg font-semibold text-amber-800 mb-3">⚠ Missing Coverage</h2>
@@ -89,10 +89,7 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                           </span>
                         </td>
                         <td className="px-4 py-2 text-gray-600 text-xs">
-                          {reason === 'aging'
-                            ? agingSuggestions[stage]
-                            : freshSuggestions[stage]
-                          }
+                          {reason === 'aging' ? agingSuggestions[stage] : freshSuggestions[stage]}
                         </td>
                       </tr>
                     ))}
@@ -104,10 +101,63 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
         </>
       )}
 
-      {/* Brief tab */}
-      {tab === 'brief' && (
-        <BriefPanel sections={briefSections} />
+      {/* Archive tab */}
+      {tab === 'archive' && (
+        <div>
+          <p className="text-sm text-gray-500 mb-4">
+            Previously used assets — pulled from rotation or rejected. Click the status badge to restore an asset if needed.
+          </p>
+          {archivedAssets.length === 0 ? (
+            <div className="text-center text-gray-400 py-12 border border-dashed border-gray-200 rounded-lg">
+              No archived assets yet
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2.5">Asset Name</th>
+                    <th className="text-left px-4 py-2.5 w-36">Product</th>
+                    <th className="text-left px-4 py-2.5 w-32">Stage</th>
+                    <th className="text-left px-4 py-2.5 w-36">Status</th>
+                    <th className="text-left px-4 py-2.5 w-28">Type</th>
+                    <th className="text-left px-4 py-2.5 w-24">Date Added</th>
+                    <th className="text-left px-4 py-2.5 w-28">Posted By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {archivedAssets
+                    .sort((a, b) => (b.date_added ?? '').localeCompare(a.date_added ?? ''))
+                    .map((asset, i) => {
+                      const cfg = STATUS_CONFIG[asset.status]
+                      return (
+                        <tr key={asset.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2.5 text-gray-700 font-medium">{asset.asset_name}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{(asset.product as Product)?.name ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{asset.stage}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                              {asset.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{asset.content_type ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">
+                            {asset.date_added ? new Date(asset.date_added + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{asset.posted_by ?? '—'}</td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
+
+      {/* Brief tab */}
+      {tab === 'brief' && <BriefPanel sections={briefSections} />}
     </div>
   )
 }

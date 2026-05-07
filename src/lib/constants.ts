@@ -36,6 +36,7 @@ export const STAGE_CONFIG = {
 }
 
 export const STATUS_CONFIG: Record<AssetStatus, { bg: string; text: string; dot: string }> = {
+  'Pending Review':          { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500' },
   'Ready to Upload':         { bg: 'bg-green-100',  text: 'text-green-800',  dot: 'bg-green-500' },
   'Live / Running':          { bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500' },
   'Expired':                 { bg: 'bg-red-100',    text: 'text-red-800',    dot: 'bg-red-500' },

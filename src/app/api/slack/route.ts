@@ -167,6 +167,15 @@ export async function POST(req: NextRequest) {
         // ✅ — approve: queue files for Drive upload
         await queueApprovedFiles(messageTs)
 
+        // Also promote asset from Pending Review → Ready to Upload
+        const supabase = createServerClient()
+        await supabase
+          .from('assets')
+          .update({ status: 'Ready to Upload' })
+          .eq('slack_message_ts', messageTs)
+          .eq('slack_channel_id', SLACK_CHANNEL_ID)
+          .eq('status', 'Pending Review')
+
       } else if (reaction === 'x') {
         // ❌ — reject: mark assets removed + cancel any pending Drive queue entries
         const supabase = createServerClient()
@@ -282,7 +291,7 @@ export async function POST(req: NextRequest) {
       asset_name: fileName.replace(/\.[^.]+$/, ''), // strip extension for display
       content_type: parsed.contentType,
       file_name: fileName,
-      status: 'Ready to Upload' as const,
+      status: 'Pending Review' as const,
       date_added: parsed.dateAdded
         ? parsed.dateAdded.toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],

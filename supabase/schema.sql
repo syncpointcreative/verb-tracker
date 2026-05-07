@@ -33,7 +33,10 @@ CREATE TABLE assets (
   content_type     TEXT,
   file_name        TEXT,
   status           TEXT NOT NULL DEFAULT 'Needs Refresh / Missing'
-                   CHECK (status IN ('Ready to Upload','Live / Running','Expired','Needs Refresh / Missing')),
+                   CHECK (status IN ('Pending Review','Ready to Upload','Live / Running','Expired','Needs Refresh / Missing','Pulled','Removed by Request')),
+-- Run in Supabase SQL Editor to update existing DB constraint:
+-- ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_status_check;
+-- ALTER TABLE assets ADD CONSTRAINT assets_status_check CHECK (status IN ('Pending Review','Ready to Upload','Live / Running','Expired','Needs Refresh / Missing','Pulled','Removed by Request'));
   date_added       DATE,
   posted_by        TEXT,
   notes            TEXT,

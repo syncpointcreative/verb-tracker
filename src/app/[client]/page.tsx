@@ -42,7 +42,7 @@ export default async function ClientPage({ params }: Props) {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS)
 
-  const NON_COVERING_STATUSES = ['Needs Refresh / Missing', 'Expired', 'Pulled', 'Removed by Request']
+  const NON_COVERING_STATUSES = ['Pending Review', 'Needs Refresh / Missing', 'Expired', 'Pulled', 'Removed by Request']
 
   const coveredSet = new Set<string>()
   for (const asset of allAssets) {
