@@ -3,21 +3,21 @@
  *
  * Runs every hour via Vercel cron.
  * Picks up pending rows from drive_queue, downloads each file from Slack,
- * and uploads it to the correct client subfolder in Google Drive.
+ * and uploads it to the configured storage provider.
  *
  * Manual testing:
  *   curl ".../api/cron/drive-sync" -H "Authorization: Bearer <CRON_SECRET>"
  *
  * Required env vars:
- *   CRON_SECRET                 — must match Authorization: Bearer header
- *   SLACK_BOT_TOKEN             — to download files from Slack
- *   GOOGLE_SERVICE_ACCOUNT_JSON — full JSON key from GCP console
- *   GOOGLE_DRIVE_FOLDER_ID      — root Drive folder ID
+ *   CRON_SECRET       — must match Authorization: Bearer header
+ *   SLACK_BOT_TOKEN   — to download files from Slack
+ *   STORAGE_PROVIDER  — google (default) | dropbox | s3
+ *   + provider-specific vars (see src/lib/storage.ts)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { uploadFileToDrive } from '@/lib/drive'
+import { uploadFile } from '@/lib/storage'
 
 const BATCH_SIZE = 5 // process up to 5 files per run to stay within timeout
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       .eq('id', item.id)
 
     try {
-      const driveUrl = await uploadFileToDrive({
+      const driveUrl = await uploadFile({
         slackUrl:   item.url_private_download,
         fileName:   item.file_name,
         mimeType:   item.mimetype,
