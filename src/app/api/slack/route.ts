@@ -1,20 +1,19 @@
 /**
  * POST /api/slack
  *
- * Slack Event API webhook — receives file_shared / message events
- * from #creative-asset-submissions-only and upserts assets, AND handles
- * reaction_added events to queue ✅-approved assets for Google Drive upload.
+ * Slack Event API webhook — handles three event types:
+ *
+ * 1. message / file_shared  — ingest new assets from #creative-asset-submissions-only
+ * 2. message (subtype: message_deleted) — mark assets as "Removed by Request"
+ * 3. reaction_added
+ *      ✅ from Libby → queue file for Drive upload
+ *      ❌ from Libby → mark asset "Removed by Request" + cancel any pending Drive queue entry
  *
  * Slack setup:
  *   1. Enable "Event Subscriptions" in your Slack app config
- *   2. Subscribe to: message.channels, reaction_added
+ *   2. Subscribe to bot events: message.channels, reaction_added
  *   3. Set the Request URL to: https://<your-domain>/api/slack
  *   4. Add SLACK_SIGNING_SECRET + SLACK_BOT_TOKEN to your Vercel env vars
- *
- * Google Drive auto-download:
- *   When Libby (U072U0L0Y4V) adds ✅ to a message in the submissions channel,
- *   the files attached to that message are queued in drive_queue for the
- *   hourly /api/cron/drive-sync cron to pick up and upload.
  */
 
 import { createHmac, timingSafeEqual } from 'crypto'
@@ -50,7 +49,23 @@ async function verifySlackSignature(req: NextRequest, rawBody: string): Promise<
   }
 }
 
-// ─── Drive queue helper ───────────────────────────────────────────────────────
+// ─── Slack message helpers ────────────────────────────────────────────────────
+
+/** Return all Slack file IDs attached to a message (used to cancel Drive queue entries). */
+async function getFileIdsForMessage(messageTs: string): Promise<string[]> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return []
+
+  const res = await fetch(
+    `https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}&latest=${messageTs}&limit=1&inclusive=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  const json = await res.json() as {
+    ok: boolean
+    messages?: Array<{ files?: Array<{ id: string }> }>
+  }
+  return json.messages?.[0]?.files?.map(f => f.id) ?? []
+}
 
 /**
  * Fetch the message at `messageTs` from the submissions channel,
@@ -139,22 +154,39 @@ export async function POST(req: NextRequest) {
   const event = payload.event as Record<string, unknown> | undefined
   if (!event) return NextResponse.json({ ok: true })
 
-  // ─── reaction_added: Libby's ✅ queues file for Drive upload ────────────────
+  // ─── reaction_added ───────────────────────────────────────────────────────
   if (event.type === 'reaction_added') {
-    const reaction  = event.reaction as string | undefined
-    const userId    = event.user as string | undefined
-    const item      = event.item as Record<string, unknown> | undefined
+    const reaction    = event.reaction as string | undefined
+    const userId      = event.user as string | undefined
+    const item        = event.item as Record<string, unknown> | undefined
     const itemChannel = item?.channel as string | undefined
+    const messageTs   = item?.ts as string | undefined
 
-    // Only care about ✅ from Libby in the submissions channel
-    if (
-      reaction === 'white_check_mark' &&
-      userId === LIBBY_USER_ID &&
-      itemChannel === SLACK_CHANNEL_ID
-    ) {
-      const messageTs = item?.ts as string | undefined
-      if (messageTs) {
+    if (userId === LIBBY_USER_ID && itemChannel === SLACK_CHANNEL_ID && messageTs) {
+      if (reaction === 'white_check_mark') {
+        // ✅ — approve: queue files for Drive upload
         await queueApprovedFiles(messageTs)
+
+      } else if (reaction === 'x') {
+        // ❌ — reject: mark assets removed + cancel any pending Drive queue entries
+        const supabase = createServerClient()
+
+        await supabase
+          .from('assets')
+          .update({ status: 'Removed by Request' })
+          .eq('slack_message_ts', messageTs)
+          .eq('slack_channel_id', SLACK_CHANNEL_ID)
+
+        // Cancel pending Drive uploads so rejected files don't get synced
+        await supabase
+          .from('drive_queue')
+          .update({ status: 'error', error: 'Rejected by Libby (❌ reaction)' })
+          .eq('status', 'pending')
+          .in(
+            'slack_file_id',
+            // sub-select file IDs via a raw match isn't available, so we fetch them first
+            await getFileIdsForMessage(messageTs)
+          )
       }
     }
     return NextResponse.json({ ok: true })
@@ -170,6 +202,27 @@ export async function POST(req: NextRequest) {
   const slackThreadTs = event.thread_ts as string | undefined
   if (slackThreadTs && slackThreadTs !== slackTs) {
     return NextResponse.json({ ok: true }) // reply in a thread — ignore
+  }
+
+  // ─── message_deleted: mark any assets from that message as Removed ────────
+  if (event.type === 'message' && event.subtype === 'message_deleted') {
+    const deletedTs = event.deleted_ts as string | undefined
+    if (deletedTs) {
+      const supabase = createServerClient()
+      await supabase
+        .from('assets')
+        .update({ status: 'Removed by Request' })
+        .eq('slack_message_ts', deletedTs)
+        .eq('slack_channel_id', SLACK_CHANNEL_ID)
+
+      // Also cancel any pending Drive queue entries for this message
+      await supabase
+        .from('drive_queue')
+        .update({ status: 'error', error: 'Source message deleted from Slack' })
+        .eq('status', 'pending')
+        .in('slack_file_id', await getFileIdsForMessage(deletedTs))
+    }
+    return NextResponse.json({ ok: true })
   }
 
   // Collect file names from the event

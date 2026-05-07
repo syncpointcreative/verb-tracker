@@ -115,16 +115,45 @@ function extractDateFromFilename(base: string): Date | null {
 }
 
 /**
- * Infer funnel stage from filename and content type
+ * Infer funnel stage from filename and content type.
+ *
+ * Priority: Conversion > Consideration > Awareness (default).
+ * Uses both the parsed content-type label and filename keywords so assets
+ * land in the right column without manual touchpoints.
  */
 export function inferStage(filename: string, contentType: string | null): Stage {
   const upper = filename.toUpperCase()
-  if (upper.includes('CAPTION') || upper.includes('AFFILIATE') || upper.includes('PROMO')) {
-    return 'Conversion'
-  }
-  if (contentType === 'Product Demo' || contentType === 'Tutorial / How-To' ||
-      contentType === 'Testimonial / Review') {
-    return 'Consideration'
-  }
+
+  // ── Conversion (drive the click, close the sale) ──────────────────────────
+  if (
+    contentType === 'Promotional' ||
+    contentType === 'Affiliate Video' ||
+    upper.includes('PROMO') ||
+    upper.includes('CAPTION') ||   // captioned cut = conversion-optimised
+    upper.includes('AFFILIATE') ||
+    upper.includes('OFFER') ||
+    upper.includes('DISCOUNT') ||
+    upper.includes('SALE') ||
+    upper.includes('CTA')
+  ) return 'Conversion'
+
+  // ── Consideration (educate, build desire, differentiate) ──────────────────
+  if (
+    contentType === 'Product Demo' ||
+    contentType === 'Tutorial / How-To' ||
+    contentType === 'Testimonial / Review' ||
+    contentType === 'Static Imagery' ||   // product shots / info graphics
+    upper.includes('REVIEW') ||
+    upper.includes('DEMO') ||
+    upper.includes('TUTORIAL') ||
+    upper.includes('COMPARE') ||
+    upper.includes('FEATURE') ||
+    upper.includes('BENEFIT') ||
+    upper.includes('EXPLAIN') ||
+    upper.includes('HOWTO')
+  ) return 'Consideration'
+
+  // ── Awareness (stop the scroll, introduce the brand) ─────────────────────
+  // UGC, Brand/Lifestyle, Creator-Led, Motion Graphics → top-of-funnel default
   return 'Awareness'
 }
