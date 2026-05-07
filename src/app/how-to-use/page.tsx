@@ -138,6 +138,8 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'MVOM', name: 'Multi-Vitamin Orange-Mango' },
       { code: 'JHCG', name: 'Joint Health Citrus Ginger' },
       { code: 'SSVM', name: 'Sleep Support Vanilla Mint' },
+      { code: 'LEM',  name: 'Lemonade' },
+      { code: 'GLEM', name: 'Grapefruit Lemonade' },
     ],
   },
   {
