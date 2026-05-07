@@ -26,6 +26,9 @@ interface ClientSummary {
   currentStart: string
   nextStart: string
   billingDay: number
+  pendingReview: number
+  readyToUpload: number
+  needsRefresh: number
 }
 
 const FRESHNESS_TIERS = [
@@ -174,8 +177,15 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
 
     const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0 }
     const contentTypeCounts: Record<string, number> = {}
+    let pendingReview = 0
+    let readyToUpload = 0
+    let needsRefresh  = 0
 
     for (const asset of clientAssets) {
+      if (asset.status === 'Pending Review')          pendingReview++
+      if (asset.status === 'Ready to Upload')         readyToUpload++
+      if (asset.status === 'Needs Refresh / Missing') needsRefresh++
+
       // Pulled / removed assets don't contribute to freshness counts
       if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
       const tier = getFreshnessTier(asset)
@@ -195,6 +205,9 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       currentStart,
       nextStart,
       billingDay,
+      pendingReview,
+      readyToUpload,
+      needsRefresh,
     }
   })
 }
@@ -205,13 +218,89 @@ export default async function DashboardPage() {
   const [summaries, leaderboard] = await Promise.all([getClientSummaries(), getLeaderboard()])
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
+  // Build "needs attention" groups
+  const pendingClients     = summaries.filter(s => s.pendingReview > 0)
+  const readyClients       = summaries.filter(s => s.readyToUpload > 0)
+  const needsRefreshClients = summaries.filter(s => s.needsRefresh > 0 || s.freshness.stale > 0 || s.freshness.expired > 0)
+  const hasAttentionItems  = pendingClients.length > 0 || readyClients.length > 0 || needsRefreshClients.length > 0
+
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Content Dashboard</h1>
         <p className="text-gray-500 mt-1">{summaries.length} active clients</p>
       </div>
+
+      {/* Needs Attention panel */}
+      {hasAttentionItems && (
+        <div className="mb-8 bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm">
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-2">
+            <span className="text-amber-600">⚡</span>
+            <span className="font-semibold text-amber-900 text-sm">Needs Attention</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+
+            {pendingClients.length > 0 && (
+              <div className="px-5 py-3">
+                <div className="text-xs font-semibold text-violet-700 uppercase tracking-wide mb-2">
+                  Pending Libby&apos;s Review
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {pendingClients.map(({ client, pendingReview }) => (
+                    <Link key={client.id} href={`/${client.slug}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-50 border border-violet-200 rounded-full text-xs font-medium text-violet-800 hover:bg-violet-100 transition-colors">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                      {client.name}
+                      <span className="ml-0.5 text-violet-500">{pendingReview}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {readyClients.length > 0 && (
+              <div className="px-5 py-3">
+                <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
+                  Ready to Upload
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {readyClients.map(({ client, readyToUpload }) => (
+                    <Link key={client.id} href={`/${client.slug}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-medium text-blue-800 hover:bg-blue-100 transition-colors">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                      {client.name}
+                      <span className="ml-0.5 text-blue-500">{readyToUpload}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {needsRefreshClients.length > 0 && (
+              <div className="px-5 py-3">
+                <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
+                  Aging / Needs Refresh
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {needsRefreshClients.map(({ client, needsRefresh, freshness }) => {
+                    const count = needsRefresh + freshness.stale + freshness.expired
+                    return (
+                      <Link key={client.id} href={`/${client.slug}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        {client.name}
+                        <span className="ml-0.5 text-amber-500">{count}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
       {/* Client cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
