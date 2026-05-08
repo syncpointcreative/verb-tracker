@@ -239,10 +239,11 @@ async function runThursdayAlert(
     (newContent ?? []).map(a => `${a.client_id}:${a.product_id}:${a.stage}`)
   )
 
-  const isCompleted = (a: typeof mondayAssets[0]) => {
-    if (a.status === 'Pulled' || a.status === 'Removed by Request') return true
-    return deliveredThisWeek.has(`${a.client_id}:${a.product_id}:${a.stage}`)
-  }
+  // A need is completed only when new creative matching that client:product:stage
+  // combo has been submitted to #creative-assets-only this week (has a slack_message_ts).
+  // A pulled/removed asset does NOT count — that makes the need more urgent, not less.
+  const isCompleted = (a: typeof mondayAssets[0]) =>
+    deliveredThisWeek.has(`${a.client_id}:${a.product_id}:${a.stage}`)
 
   // Group by client
   const byClient = new Map<string, typeof mondayAssets>()
