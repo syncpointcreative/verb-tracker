@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter, Cormorant_Garamond } from 'next/font/google'
 import Link from 'next/link'
+import { Suspense } from 'react'
+import Sidebar from '@/components/Sidebar'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -36,53 +38,52 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`${inter.variable} ${cormorant.variable} font-sans bg-[#F2EDE7] min-h-screen`}>
+        <div className="flex min-h-screen">
 
-        {/* Top nav */}
-        <header className="bg-[#2B3428] sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-14">
+          {/* ── Desktop sidebar (md+) ── */}
+          <aside className="hidden md:block flex-shrink-0">
+            <Suspense fallback={
+              <div className="w-56 bg-[#2B3428] h-screen flex items-start px-5 py-5">
+                <span className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">VERB</span>
+              </div>
+            }>
+              <Sidebar />
+            </Suspense>
+          </aside>
 
-            {/* Left: logo + nav */}
-            <div className="flex items-center gap-8">
-              <Link href="/" className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">
-                VERB
-              </Link>
-              <nav className="hidden sm:flex items-center gap-0.5">
-                {[
-                  { href: '/',          label: 'Dashboard'  },
-                  { href: '/matrix',    label: 'Coverage'   },
-                  { href: '/how-to-use',label: 'How to Use' },
-                  { href: '/admin',     label: 'Admin'      },
-                ].map(({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="px-3 py-1.5 text-sm text-[#A8A09A] hover:text-[#F5F1EB] transition-colors tracking-wide rounded"
-                  >
-                    {label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
+          {/* ── Main area ── */}
+          <div className="flex-1 min-w-0 flex flex-col">
 
-            {/* Right: Drive link */}
-            <a
-              href="https://drive.google.com/drive/folders/1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm?usp=sharing"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-[#C4A263] hover:text-[#D4B373] tracking-[0.12em] uppercase flex items-center gap-1.5 transition-colors"
-            >
-              Drive
-              <svg className="w-3 h-3 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M2.5 9.5l7-7M9.5 2.5H4M9.5 2.5V8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
+            {/* Mobile top nav */}
+            <header className="md:hidden bg-[#2B3428] sticky top-0 z-50">
+              <div className="flex items-center justify-between h-14 px-4">
+                <Link href="/" className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">
+                  VERB
+                </Link>
+                <nav className="flex items-center gap-1">
+                  {[
+                    { href: '/',            label: 'Home'     },
+                    { href: '/matrix',      label: 'Coverage' },
+                    { href: '/how-to-use',  label: 'Guide'    },
+                  ].map(({ href, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="px-2.5 py-1.5 text-xs text-[#A8A09A] hover:text-[#F5F1EB] transition-colors"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            </header>
+
+            {/* Page content */}
+            <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+              {children}
+            </main>
           </div>
-        </header>
-
-        {/* Page content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
+        </div>
       </body>
     </html>
   )
