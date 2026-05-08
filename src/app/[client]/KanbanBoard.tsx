@@ -12,14 +12,23 @@ interface Props {
 
 // ── Freshness ────────────────────────────────────────────────────────────────
 
-function getDaysOld(asset: Asset): number | null {
-  const dateStr = asset.date_live ?? asset.date_added
-  if (!dateStr) return null
-  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000)
+// Mirrors AssetTable's FreshnessMeter exactly:
+// - Only counts from date_live (the TikTok upload date), never date_added
+// - Returns null for statuses that don't have a meaningful live age
+function getFreshness(asset: Asset): { days: number } | 'not-live' | null {
+  if (['Pulled', 'Removed by Request', 'Pending Review'].includes(asset.status)) return null
+  if (!asset.date_live) return 'not-live'
+  const days = Math.floor((Date.now() - new Date(asset.date_live + 'T12:00:00').getTime()) / 86_400_000)
+  return { days }
 }
 
-function FreshnessPill({ days }: { days: number | null }) {
-  if (days === null) return null
+function FreshnessPill({ asset }: { asset: Asset }) {
+  const f = getFreshness(asset)
+  if (f === null) return null
+  if (f === 'not-live') return (
+    <span className="text-[10px] tracking-wide text-stone-400 bg-stone-100 border border-stone-200 rounded-full px-2 py-0.5">Not live</span>
+  )
+  const { days } = f
   if (days <= 7)  return <span className="text-[10px] tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{days}d · Fresh</span>
   if (days <= 14) return <span className="text-[10px] tracking-wide text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">{days}d · Monitor</span>
   if (days <= 21) return <span className="text-[10px] tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{days}d · Refresh</span>
@@ -39,10 +48,6 @@ const COLUMN: Record<Stage, { accent: string; rule: string; label: string; descr
 function AssetCard({ asset }: { asset: Asset }) {
   const product = asset.product as Product | null
   const cfg = STATUS_CONFIG[asset.status]
-  const days = getDaysOld(asset)
-
-  // Show freshness only for statuses that have a meaningful age
-  const showFreshness = !['Pending Review', 'Needs Refresh / Missing', 'Expired'].includes(asset.status)
 
   return (
     <div className="bg-[#F5F1EB] border border-stone-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-stone-300 transition-all group">
@@ -52,7 +57,7 @@ function AssetCard({ asset }: { asset: Asset }) {
           <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
           {asset.status}
         </span>
-        {showFreshness && <FreshnessPill days={days} />}
+        <FreshnessPill asset={asset} />
       </div>
 
       {/* Asset name */}
