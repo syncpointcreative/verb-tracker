@@ -7,11 +7,12 @@ import ClientTabs from './ClientTabs'
 
 interface Props {
   params: { client: string }
+  searchParams: { status?: string }
 }
 
 export const revalidate = 0
 
-export default async function ClientPage({ params }: Props) {
+export default async function ClientPage({ params, searchParams }: Props) {
   const supabase = createServerClient()
 
   // Fetch client
@@ -111,12 +112,13 @@ export default async function ClientPage({ params }: Props) {
         )}
       </div>
 
-      {/* Tabbed content: Assets + Creator Brief */}
+      {/* Tabbed content: Board, Table, Archive, Brief */}
       <ClientTabs
         assets={allAssets}
         products={allProducts}
         briefSections={briefSections}
         missingCoverage={missingCoverage}
+        initialStatus={searchParams.status ?? null}
       />
     </div>
   )
