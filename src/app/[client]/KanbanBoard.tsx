@@ -15,8 +15,9 @@ interface Props {
 // Mirrors AssetTable's FreshnessMeter exactly:
 // - Only counts from date_live (the TikTok upload date), never date_added
 // - Returns null for statuses that don't have a meaningful live age
-function getFreshness(asset: Asset): { days: number } | 'not-live' | null {
+function getFreshness(asset: Asset): { days: number } | 'not-live' | 'paused' | null {
   if (['Pulled', 'Removed by Request', 'Pending Review'].includes(asset.status)) return null
+  if (asset.status === 'Paused') return 'paused'
   if (!asset.date_live) return 'not-live'
   const days = Math.floor((Date.now() - new Date(asset.date_live + 'T12:00:00').getTime()) / 86_400_000)
   return { days }
@@ -27,6 +28,9 @@ function FreshnessPill({ asset }: { asset: Asset }) {
   if (f === null) return null
   if (f === 'not-live') return (
     <span className="text-[10px] tracking-wide text-stone-400 bg-stone-100 border border-stone-200 rounded-full px-2 py-0.5">Not live</span>
+  )
+  if (f === 'paused') return (
+    <span className="text-[10px] tracking-wide text-sky-600 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5">⏸ Paused</span>
   )
   const { days } = f
   if (days <= 7)  return <span className="text-[10px] tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{days}d · Fresh</span>
@@ -135,6 +139,7 @@ const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Ready to Upload',
   'Pending Review',
   'Live / Running',
+  'Paused',
   'Needs Refresh / Missing',
   'Expired',
 ]

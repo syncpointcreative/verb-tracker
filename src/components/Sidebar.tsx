@@ -32,12 +32,13 @@ export default async function Sidebar() {
       if (asset.status === 'Expired') { hasRed = true; break }
       if (asset.status === 'Needs Refresh / Missing') { hasAmber = true; continue }
       if (asset.status === 'Pending Review') { hasAmber = true; continue }
+      // Paused is intentional — don't penalise health dot for it
+      if (asset.status === 'Paused') { continue }
 
-      // Check freshness for live/ready assets
-      const dateStr = asset.date_live ?? asset.date_added
-      if (dateStr) {
+      // Check freshness for live/ready assets (only date_live counts)
+      if (asset.date_live) {
         const days = Math.floor(
-          (Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000
+          (Date.now() - new Date(asset.date_live + 'T12:00:00').getTime()) / 86_400_000
         )
         if (days > 21) hasRed = true
       }

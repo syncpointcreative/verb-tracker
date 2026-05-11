@@ -16,13 +16,14 @@ interface PendingChange {
 }
 
 // Statuses shown in the main stage tables (active assets)
-const ACTIVE_STATUSES: AssetStatus[] = ['Ready to Upload', 'Live / Running', 'Needs Refresh / Missing', 'Expired']
+const ACTIVE_STATUSES: AssetStatus[] = ['Ready to Upload', 'Live / Running', 'Paused', 'Needs Refresh / Missing', 'Expired']
 
 // Valid next-state transitions per current status
 const STATUS_TRANSITIONS: Partial<Record<AssetStatus, AssetStatus[]>> = {
   'Pending Review':          ['Ready to Upload', 'Removed by Request'],
   'Ready to Upload':         ['Live / Running', 'Pulled', 'Removed by Request'],
-  'Live / Running':          ['Pulled', 'Needs Refresh / Missing', 'Removed by Request'],
+  'Live / Running':          ['Paused', 'Pulled', 'Needs Refresh / Missing', 'Removed by Request'],
+  'Paused':                  ['Live / Running', 'Pulled'],
   'Needs Refresh / Missing': ['Ready to Upload', 'Pulled'],
   'Expired':                 ['Ready to Upload', 'Pulled'],
   'Pulled':                  ['Ready to Upload'],
@@ -85,6 +86,9 @@ const FRESHNESS = [
 function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
   if (status === 'Pulled' || status === 'Removed by Request' || status === 'Pending Review') {
     return <span className="text-stone-300 text-xs">—</span>
+  }
+  if (status === 'Paused') {
+    return <span className="text-sky-500 text-xs font-medium">Paused ⏸</span>
   }
   if (status === 'Ready to Upload' || !dateLive) {
     return <span className="text-stone-300 text-xs">Not live</span>
@@ -221,6 +225,7 @@ const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: stri
   { status: 'Pending Review',          label: 'Pending',       bg: 'bg-violet-100',  text: 'text-violet-700', dot: 'bg-violet-400',  activeBg: 'bg-violet-200'  },
   { status: 'Ready to Upload',         label: 'Ready',         bg: 'bg-blue-100',    text: 'text-blue-700',   dot: 'bg-blue-400',    activeBg: 'bg-blue-200'    },
   { status: 'Live / Running',          label: 'Live',          bg: 'bg-emerald-100', text: 'text-emerald-700',dot: 'bg-emerald-400', activeBg: 'bg-emerald-200' },
+  { status: 'Paused',                  label: 'Paused',        bg: 'bg-sky-100',     text: 'text-sky-700',    dot: 'bg-sky-400',     activeBg: 'bg-sky-200'     },
   { status: 'Needs Refresh / Missing', label: 'Needs Refresh', bg: 'bg-amber-100',   text: 'text-amber-700',  dot: 'bg-amber-400',   activeBg: 'bg-amber-200'   },
   { status: 'Expired',                 label: 'Expired',       bg: 'bg-stone-100',   text: 'text-stone-500',  dot: 'bg-stone-400',   activeBg: 'bg-stone-200'   },
 ]

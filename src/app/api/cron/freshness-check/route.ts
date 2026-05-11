@@ -88,6 +88,7 @@ async function runMondayAlert(
   appUrl: string,
   token: string
 ) {
+  // Paused assets are intentionally offline (e.g. out of stock) — skip them
   const { data: assets, error } = await supabase
     .from('assets')
     .select(`
