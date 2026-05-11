@@ -24,10 +24,23 @@ const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 type Tab = 'board' | 'assets' | 'archive' | 'brief'
 
 export default function ClientTabs({ assets, products, briefSections, missingCoverage, initialStatus }: Props) {
-  const [tab, setTab] = useState<Tab>('board')
+  const [tab, setTab]           = useState<Tab>('board')
+  const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
 
-  const activeAssets   = assets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
-  const archivedAssets = assets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
+  const activeAssets   = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
+  const archivedAssets = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
+
+  const restoreAsset = async (asset: Asset) => {
+    setRestoringId(asset.id)
+    await fetch(`/api/assets?id=${asset.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Ready to Upload' }),
+    })
+    setLocalAssets(prev => prev.map(a => a.id === asset.id ? { ...a, status: 'Ready to Upload' } : a))
+    setRestoringId(null)
+  }
 
   // Tab bar styling — ProEthical palette
   const tabCls = (active: boolean) =>
@@ -128,7 +141,7 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
       {tab === 'archive' && (
         <div>
           <p className="text-sm text-stone-400 mb-5 font-serif italic">
-            Previously used assets — pulled from rotation or rejected. Click the status badge to restore if needed.
+            Previously used assets — pulled from rotation or rejected. Click the status badge to restore to Ready to Upload.
           </p>
           {archivedAssets.length === 0 ? (
             <div className="text-center text-stone-300 py-12 border border-dashed border-stone-200 rounded-xl">
@@ -159,10 +172,15 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                           <td className="px-4 py-2.5 text-stone-400 text-xs">{(asset.product as Product)?.name ?? '—'}</td>
                           <td className="px-4 py-2.5 text-stone-400 text-xs">{asset.stage}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+                            <button
+                              onClick={() => restoreAsset(asset)}
+                              disabled={restoringId === asset.id}
+                              title="Click to restore to Ready to Upload"
+                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all hover:ring-2 hover:ring-offset-1 hover:ring-[#C4A263]/50 disabled:opacity-50 cursor-pointer ${cfg.bg} ${cfg.text}`}
+                            >
                               <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                              {asset.status}
-                            </span>
+                              {restoringId === asset.id ? 'Restoring…' : asset.status}
+                            </button>
                           </td>
                           <td className="px-4 py-2.5 text-stone-400 text-xs hidden sm:table-cell">{asset.content_type ?? '—'}</td>
                           <td className="px-4 py-2.5 text-stone-400 text-xs hidden sm:table-cell">

@@ -18,7 +18,7 @@ interface Asset {
 }
 
 const STAGES = ['Awareness', 'Consideration', 'Conversion']
-const STATUSES = ['Pending Review', 'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
+const STATUSES = ['Pending Review', 'Ready to Upload', 'Live / Running', 'Paused', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
 
 function fmt(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [saving, setSaving]         = useState<string | null>(null)
   const [toast, setToast]           = useState<string | null>(null)
   const [syncing, setSyncing]       = useState(false)
+  const [downloadSort, setDownloadSort] = useState<'client' | 'date'>('client')
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -428,9 +429,25 @@ export default function AdminPage() {
       {/* ── TAB: Downloads ───────────────────────────────────────────────────── */}
       {tab === 'downloads' && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">
-            Assets approved by Libby (✅) — click Download to save to your machine.
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-gray-500">
+              Assets approved by Libby (✅) — click Download to save to your machine.
+            </p>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setDownloadSort('client')}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${downloadSort === 'client' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                By Client
+              </button>
+              <button
+                onClick={() => setDownloadSort('date')}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${downloadSort === 'date' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                By Date
+              </button>
+            </div>
+          </div>
           {driveQueue.length === 0 ? (
             <div className="text-center text-gray-400 py-12">No approved assets in the queue yet</div>
           ) : (
@@ -446,7 +463,11 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {driveQueue.map(item => (
+                  {[...driveQueue].sort((a, b) =>
+                    downloadSort === 'client'
+                      ? a.client_name.localeCompare(b.client_name) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  ).map(item => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{item.file_name}</td>
                       <td className="px-4 py-2.5 text-gray-600">{item.client_name}</td>
