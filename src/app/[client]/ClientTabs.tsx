@@ -156,16 +156,21 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                     <th className="text-left px-4 py-2.5 w-36">Product</th>
                     <th className="text-left px-4 py-2.5 w-32">Stage</th>
                     <th className="text-left px-4 py-2.5 w-36">Status</th>
-                    <th className="text-left px-4 py-2.5 w-28 hidden sm:table-cell">Type</th>
-                    <th className="text-left px-4 py-2.5 w-24 hidden sm:table-cell">Date Added</th>
+                    <th className="text-left px-4 py-2.5 w-36 hidden sm:table-cell">Performance</th>
+                    <th className="text-left px-4 py-2.5 w-28 hidden sm:table-cell">Archived</th>
                     <th className="text-left px-4 py-2.5 w-28 hidden sm:table-cell">Posted By</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {archivedAssets
-                    .sort((a, b) => (b.date_added ?? '').localeCompare(a.date_added ?? ''))
+                    .sort((a, b) => (b.status_changed_at ?? b.date_added ?? '').localeCompare(a.status_changed_at ?? a.date_added ?? ''))
                     .map(asset => {
                       const cfg = STATUS_CONFIG[asset.status]
+                      const perfColor =
+                        asset.performance === 'High Performer'    ? 'text-emerald-700 bg-emerald-50 border-emerald-200' :
+                        asset.performance === 'Average Performer' ? 'text-amber-700 bg-amber-50 border-amber-200' :
+                        asset.performance === 'Poor Performer'    ? 'text-red-700 bg-red-50 border-red-200' :
+                        'text-stone-400 bg-stone-50 border-stone-200'
                       return (
                         <tr key={asset.id} className="hover:bg-stone-50/80 transition-colors">
                           <td className="px-4 py-2.5 text-stone-700 font-medium">{asset.asset_name}</td>
@@ -182,11 +187,32 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
                               {restoringId === asset.id ? 'Restoring…' : asset.status}
                             </button>
                           </td>
-                          <td className="px-4 py-2.5 text-stone-400 text-xs hidden sm:table-cell">{asset.content_type ?? '—'}</td>
+                          <td className="px-4 py-2.5 hidden sm:table-cell">
+                            <select
+                              value={asset.performance ?? ''}
+                              onChange={async e => {
+                                const val = e.target.value || null
+                                setLocalAssets(prev => prev.map(a => a.id === asset.id ? { ...a, performance: val as Asset['performance'] } : a))
+                                await fetch(`/api/assets?id=${asset.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ performance: val }),
+                                })
+                              }}
+                              className={`text-[10px] border rounded-full px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#C4A263]/40 ${perfColor}`}
+                            >
+                              <option value="">— Rate it —</option>
+                              <option value="High Performer">High Performer</option>
+                              <option value="Average Performer">Average Performer</option>
+                              <option value="Poor Performer">Poor Performer</option>
+                            </select>
+                          </td>
                           <td className="px-4 py-2.5 text-stone-400 text-xs hidden sm:table-cell">
-                            {asset.date_added
-                              ? new Date(asset.date_added + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-                              : '—'}
+                            {asset.status_changed_at
+                              ? new Date(asset.status_changed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                              : asset.date_added
+                                ? new Date(asset.date_added + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                                : '—'}
                           </td>
                           <td className="px-4 py-2.5 text-stone-400 text-xs hidden sm:table-cell">{asset.posted_by ?? '—'}</td>
                         </tr>

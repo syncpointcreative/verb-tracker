@@ -16,7 +16,8 @@ import type { AssetStatus, Stage } from '@/lib/supabase'
 
 const VALID_STAGES = new Set<Stage>(['Awareness', 'Consideration', 'Conversion'])
 const VALID_STATUSES = new Set<AssetStatus>([
-  'Ready to Upload', 'Live / Running', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request',
+  'Pending Review', 'Ready to Upload', 'Live / Running', 'Paused',
+  'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request',
 ])
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
@@ -94,7 +95,7 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   // Whitelist updatable fields
-  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'posted_by', 'notes', 'product_id']
+  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'posted_by', 'notes', 'product_id', 'performance']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -111,7 +112,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
-  // Auto-stamp date_live when status first changes to "Live / Running"
+  // Stamp status_changed_at whenever status changes
+  if ('status' in updates) {
+    updates.status_changed_at = new Date().toISOString()
+  }
+
+  // Auto-stamp date_live when status first changes to "Live / Running" (not when resuming from Paused)
   if (updates.status === 'Live / Running' && !('date_live' in body)) {
     const { data: existing } = await supabase.from('assets').select('date_live').eq('id', id).single()
     if (!existing?.date_live) {

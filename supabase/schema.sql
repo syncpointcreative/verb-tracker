@@ -42,6 +42,8 @@ CREATE TABLE assets (
   notes            TEXT,
   slack_message_ts TEXT,
   slack_channel_id TEXT,
+  status_changed_at TIMESTAMPTZ,                          -- stamped by API on every status change
+  performance      TEXT CHECK (performance IN ('High Performer','Average Performer','Poor Performer')),
   created_at       TIMESTAMPTZ DEFAULT now(),
   updated_at       TIMESTAMPTZ DEFAULT now()
 );

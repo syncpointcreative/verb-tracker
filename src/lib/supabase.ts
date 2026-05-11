@@ -34,6 +34,8 @@ export interface Asset {
   notes: string | null
   slack_message_ts: string | null
   slack_channel_id: string | null
+  status_changed_at: string | null
+  performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
   created_at: string
   updated_at: string
   // joined

@@ -335,8 +335,12 @@ export default function AssetTable({ assets, products }: Props) {
   }
 
   const handleStatusChange = async (assetId: string, newStatus: AssetStatus) => {
+    const asset = localAssets.find(a => a.id === assetId)
     const body: Record<string, string> = { status: newStatus }
-    if (newStatus === 'Live / Running') body.date_live = new Date().toISOString().split('T')[0]
+    // Only stamp date_live on first-ever go-live. Resuming from Paused keeps the original date.
+    if (newStatus === 'Live / Running' && !asset?.date_live) {
+      body.date_live = new Date().toISOString().split('T')[0]
+    }
     setLocalAssets(prev => prev.map(a =>
       a.id === assetId ? { ...a, status: newStatus, ...(body.date_live ? { date_live: body.date_live } : {}) } : a
     ))
@@ -387,8 +391,15 @@ export default function AssetTable({ assets, products }: Props) {
           <StatusDropdown asset={asset} onStatusChange={handleStatusChange} />
         </td>
 
-        {/* Date */}
-        <td className="px-3 py-2 text-stone-400 text-xs whitespace-nowrap">{fmt(asset.date_added)}</td>
+        {/* Date added + last status change */}
+        <td className="px-3 py-2 text-stone-400 text-xs whitespace-nowrap">
+          <div>{fmt(asset.date_added)}</div>
+          {asset.status_changed_at && (
+            <div className="text-[10px] text-stone-300 mt-0.5">
+              Status: {new Date(asset.status_changed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+            </div>
+          )}
+        </td>
 
         {/* Creator */}
         <td className="px-3 py-2">

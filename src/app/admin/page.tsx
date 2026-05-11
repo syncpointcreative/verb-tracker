@@ -39,7 +39,9 @@ export default function AdminPage() {
   const [saving, setSaving]         = useState<string | null>(null)
   const [toast, setToast]           = useState<string | null>(null)
   const [syncing, setSyncing]       = useState(false)
-  const [downloadSort, setDownloadSort] = useState<'client' | 'date'>('client')
+  const [dlFilter, setDlFilter] = useState<{ file: string; client: string; status: string; sort: 'newest' | 'oldest' }>({
+    file: '', client: '', status: '', sort: 'newest',
+  })
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -429,45 +431,71 @@ export default function AdminPage() {
       {/* ── TAB: Downloads ───────────────────────────────────────────────────── */}
       {tab === 'downloads' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">
-              Assets approved by Libby (✅) — click Download to save to your machine.
-            </p>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setDownloadSort('client')}
-                className={`px-3 py-1 text-xs rounded-md transition-colors ${downloadSort === 'client' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                By Client
-              </button>
-              <button
-                onClick={() => setDownloadSort('date')}
-                className={`px-3 py-1 text-xs rounded-md transition-colors ${downloadSort === 'date' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                By Date
-              </button>
-            </div>
-          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Assets approved by Libby (✅) — click Download to save to your machine.
+          </p>
           {driveQueue.length === 0 ? (
             <div className="text-center text-gray-400 py-12">No approved assets in the queue yet</div>
-          ) : (
+          ) : (() => {
+            const uniqueClients  = [...new Set(driveQueue.map(i => i.client_name))].sort()
+            const uniqueStatuses = [...new Set(driveQueue.map(i => i.status))].sort()
+            const filtered = [...driveQueue]
+              .filter(i =>
+                (!dlFilter.file   || i.file_name.toLowerCase().includes(dlFilter.file.toLowerCase())) &&
+                (!dlFilter.client || i.client_name === dlFilter.client) &&
+                (!dlFilter.status || i.status === dlFilter.status)
+              )
+              .sort((a, b) =>
+                dlFilter.sort === 'oldest'
+                  ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              )
+            const thCls = "px-4 py-2 text-left"
+            const inputCls = "mt-1 w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            return (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
-                    <th className="text-left px-4 py-2.5">File</th>
-                    <th className="text-left px-4 py-2.5 w-36">Client</th>
-                    <th className="text-left px-4 py-2.5 w-28">Status</th>
-                    <th className="text-left px-4 py-2.5 w-36">Queued</th>
-                    <th className="px-4 py-2.5 w-28"></th>
+                    <th className={thCls}>
+                      <div>File</div>
+                      <input
+                        type="text"
+                        placeholder="Search…"
+                        value={dlFilter.file}
+                        onChange={e => setDlFilter(f => ({ ...f, file: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </th>
+                    <th className={`${thCls} w-40`}>
+                      <div>Client</div>
+                      <select value={dlFilter.client} onChange={e => setDlFilter(f => ({ ...f, client: e.target.value }))} className={inputCls}>
+                        <option value="">All</option>
+                        {uniqueClients.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </th>
+                    <th className={`${thCls} w-32`}>
+                      <div>Status</div>
+                      <select value={dlFilter.status} onChange={e => setDlFilter(f => ({ ...f, status: e.target.value }))} className={inputCls}>
+                        <option value="">All</option>
+                        {uniqueStatuses.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                    </th>
+                    <th className={`${thCls} w-36`}>
+                      <div>Queued</div>
+                      <select value={dlFilter.sort} onChange={e => setDlFilter(f => ({ ...f, sort: e.target.value as 'newest' | 'oldest' }))} className={inputCls}>
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 w-28"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {[...driveQueue].sort((a, b) =>
-                    downloadSort === 'client'
-                      ? a.client_name.localeCompare(b.client_name) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                  ).map(item => (
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">No results match your filters</td></tr>
+                  )}
+                  {filtered.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{item.file_name}</td>
                       <td className="px-4 py-2.5 text-gray-600">{item.client_name}</td>
@@ -495,7 +523,8 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-          )}
+            )
+          })()}
         </div>
       )}
 
