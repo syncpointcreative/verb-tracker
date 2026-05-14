@@ -144,14 +144,23 @@ const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Expired',
 ]
 
+const STALE_FILTER = '__stale__'
+
+function isStale(asset: Asset): boolean {
+  const f = getFreshness(asset)
+  return typeof f === 'object' && f !== null && f.days > 21
+}
+
 function FilterBar({
   activeFilter,
   onFilter,
   counts,
+  staleCount,
 }: {
   activeFilter: string | null
   onFilter: (s: string | null) => void
   counts: Record<string, number>
+  staleCount: number
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -187,6 +196,23 @@ function FilterBar({
           </button>
         )
       })}
+      {/* Freshness: Stale filter */}
+      {staleCount > 0 && (
+        <button
+          onClick={() => onFilter(activeFilter === STALE_FILTER ? null : STALE_FILTER)}
+          className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+            activeFilter === STALE_FILTER
+              ? 'bg-red-100 text-red-700 border-transparent'
+              : 'text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700 bg-white'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+          Stale
+          <span className={`tabular-nums text-[10px] ${activeFilter === STALE_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
+            {staleCount}
+          </span>
+        </button>
+      )}
     </div>
   )
 }
@@ -206,9 +232,16 @@ export default function KanbanBoard({ assets, initialStatus }: Props) {
     return counts
   }, [assets])
 
+  // Count stale assets (22+ days live)
+  const staleCount = useMemo(() => assets.filter(isStale).length, [assets])
+
   // Filtered + grouped by stage
   const byStage = useMemo(() => {
-    const filtered = statusFilter ? assets.filter(a => a.status === statusFilter) : assets
+    const filtered = statusFilter === STALE_FILTER
+      ? assets.filter(isStale)
+      : statusFilter
+        ? assets.filter(a => a.status === statusFilter)
+        : assets
     const grouped: Record<Stage, Asset[]> = { Awareness: [], Consideration: [], Conversion: [] }
     for (const a of filtered) {
       if (a.stage in grouped) grouped[a.stage as Stage].push(a)
@@ -226,6 +259,7 @@ export default function KanbanBoard({ assets, initialStatus }: Props) {
           activeFilter={statusFilter}
           onFilter={setStatusFilter}
           counts={statusCounts}
+          staleCount={staleCount}
         />
         {statusFilter && totalFiltered === 0 && (
           <p className="mt-3 text-xs text-stone-400">No assets match this filter.</p>
