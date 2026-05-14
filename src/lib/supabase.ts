@@ -17,6 +17,7 @@ export interface Product {
   client_id: string
   name: string
   sort_order: number
+  discontinued: boolean
 }
 
 export interface Asset {

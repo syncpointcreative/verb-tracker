@@ -93,7 +93,7 @@ async function runMondayAlert(
     .from('assets')
     .select(`
       id, status, stage, content_type, date_added, date_live, client_id, product_id,
-      product:products(name),
+      product:products(name, discontinued),
       client:clients(id, name, slug)
     `)
     .in('status', ['Live / Running', 'Needs Refresh / Missing'])
@@ -104,6 +104,7 @@ async function runMondayAlert(
   }
 
   const needsAlert = (assets ?? []).filter(a => {
+    if ((a.product as unknown as { discontinued?: boolean } | null)?.discontinued) return false
     const d = getRelevantDate(a)
     return d ? daysSince(d) >= REFRESH_SOON_DAYS : false
   })
@@ -215,7 +216,7 @@ async function runThursdayAlert(
     .from('assets')
     .select(`
       id, status, stage, content_type, date_added, date_live, client_id, product_id,
-      product:products(name),
+      product:products(name, discontinued),
       client:clients(id, name, slug)
     `)
     .gte('refresh_notified_at', lastMonday)
@@ -246,9 +247,14 @@ async function runThursdayAlert(
   const isCompleted = (a: typeof mondayAssets[0]) =>
     deliveredThisWeek.has(`${a.client_id}:${a.product_id}:${a.stage}`)
 
+  // Filter out discontinued products before building the report
+  const activeAssets = mondayAssets.filter(
+    a => !(a.product as unknown as { discontinued?: boolean } | null)?.discontinued
+  )
+
   // Group by client
-  const byClient = new Map<string, typeof mondayAssets>()
-  for (const a of mondayAssets) {
+  const byClient = new Map<string, typeof activeAssets>()
+  for (const a of activeAssets) {
     if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
     byClient.get(a.client_id)!.push(a)
   }

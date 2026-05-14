@@ -69,6 +69,7 @@ export default async function ClientPage({ params, searchParams }: Props) {
 
   const missingCoverage: { product: Product; stage: Stage; reason: 'aging' | 'missing' }[] = []
   for (const product of allProducts) {
+    if (product.discontinued) continue  // skip discontinued products — existing assets stay visible
     for (const stage of STAGES) {
       if (!coveredSet.has(`${product.id}-${stage}`)) {
         const reason = hasAnyAsset.has(`${product.id}-${stage}`) ? 'aging' : 'missing'
