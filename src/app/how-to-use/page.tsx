@@ -199,11 +199,11 @@ export default function HowToUsePage() {
       <section className="mb-10">
         <h2 className="text-lg font-bold text-gray-900 mb-3">File Naming Convention</h2>
         <div className="bg-gray-900 text-green-400 font-mono text-sm rounded-lg px-5 py-4 mb-3">
-          CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE.mp4
+          CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE.mp4
         </div>
-        <p className="text-sm text-gray-500 mb-2">Example: <code className="bg-gray-100 px-1.5 py-0.5 rounded">BIOM-APW-UGC-DB-SpringReset-040726.mp4</code> = Biom · All Purpose Wipes · UGC · David Butler · Spring Reset · April 7, 2026</p>
+        <p className="text-sm text-gray-500 mb-2">Example: <code className="bg-gray-100 px-1.5 py-0.5 rounded">CHOMPS-SMK-UGC-AWA-LR-SummerHook-050626.mp4</code> = Chomps · Smokey BBQ Beef · UGC · Awareness · Libby Ragole · Summer Hook · May 6, 2026</p>
         <p className="text-xs text-gray-400 mb-1">Date format: MMDDYY &nbsp;·&nbsp; Add <code className="bg-gray-100 px-1">-CAPTIONS</code> before the extension if a caption file is included</p>
-        <p className="text-xs text-gray-400">Title should be a short descriptive slug with no spaces — use camel case or underscores (e.g. <code className="bg-gray-100 px-1">SpringReset</code>, <code className="bg-gray-100 px-1">BBQ_Snack</code>)</p>
+        <p className="text-xs text-gray-400">Title should be a short descriptive slug with no spaces — use camel case or underscores (e.g. <code className="bg-gray-100 px-1">SummerHook</code>, <code className="bg-gray-100 px-1">BBQ_Snack</code>)</p>
       </section>
 
       {/* Product Code Key */}
@@ -231,7 +231,7 @@ export default function HowToUsePage() {
         </div>
       </section>
 
-      {/* Content Type + Creator Codes */}
+      {/* Content Type + Creator + Funnel Stage Codes */}
       <section className="mb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -259,6 +259,31 @@ export default function HowToUsePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="border border-gray-200 rounded-lg overflow-hidden md:col-span-2">
+            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold">Funnel Stage Codes</div>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-gray-100">
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">AWA</td>
+                  <td className="px-4 py-2 text-gray-700 font-medium">Awareness</td>
+                  <td className="px-4 py-2 text-gray-500">Stop the scroll. Hook-driven, brand intro, scroll-stopping content.</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">CON</td>
+                  <td className="px-4 py-2 text-gray-700 font-medium">Consideration</td>
+                  <td className="px-4 py-2 text-gray-500">Educate and build desire. Demo, tutorial, testimonial, before/after.</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">CVR</td>
+                  <td className="px-4 py-2 text-gray-700 font-medium">Conversion</td>
+                  <td className="px-4 py-2 text-gray-500">Drive the click. Promo, offer-led, affiliate, urgency-driven.</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="bg-gray-50 border-t border-gray-200 px-4 py-2.5 text-xs text-gray-400">
+              Target split: 50% Awareness · 30% Consideration · 20% Conversion
+            </div>
           </div>
         </div>
       </section>
