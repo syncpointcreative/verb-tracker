@@ -82,6 +82,15 @@ export const PRODUCT_CODES: Record<string, string> = {
   CCSD: 'Chili Crunch Sushi Dip',
   LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
 }
+// Funnel stage codes — embedded in filename at position 4 (after TYPE)
+// Format: CLIENT-PRODUCT-TYPE-STAGE-CREATOR-DATE
+// e.g.  CHOMPS-SMK-UGC-AWA-LR-050626.mp4
+export const STAGE_CODES: Record<string, string> = {
+  AWA: 'Awareness',
+  CON: 'Consideration',
+  CVR: 'Conversion',
+}
+
 export const TYPE_CODES: Record<string, string> = {
   UGC: 'UGC', BLS: 'Brand / Lifestyle', PD: 'Product Demo',
   CRL: 'Creator-Led', TREV: 'Testimonial / Review',

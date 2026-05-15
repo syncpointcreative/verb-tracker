@@ -1,22 +1,29 @@
 /**
  * Parses a filename using the VERB naming convention:
- * CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]   (new format, 6 parts)
- * CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]          (legacy format, 5 parts)
- * e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
- *      BIOM-APW-UGC-DB-040726.mp4
+ *
+ * NEW (stage-aware):
+ *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-DATE[.ext]        (6-part)
+ *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE[.ext]  (7-part)
+ *   e.g. CHOMPS-SMK-UGC-AWA-LR-050626.mp4
+ *
+ * LEGACY (still supported):
+ *   CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]        (6-part)
+ *   CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]              (5-part)
+ *   e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
  */
-import { CLIENT_CODES, PRODUCT_CODES, TYPE_CODES, CREATOR_CODES } from './constants'
+import { CLIENT_CODES, PRODUCT_CODES, TYPE_CODES, CREATOR_CODES, STAGE_CODES } from './constants'
 import { Stage } from './supabase'
 
 export interface ParsedFilename {
   clientName: string | null
   productName: string | null
   contentType: string | null
+  stage: Stage | null        // explicitly coded (AWA/CON/CVR) — null means infer from content
   postedBy: string | null
   title: string | null
   dateAdded: Date | null
   hasCaption: boolean
-  confidence: 'high' | 'low'  // high = matched naming convention, low = guessed from context
+  confidence: 'high' | 'low'
 }
 
 export function parseFilename(filename: string): ParsedFilename {
@@ -26,43 +33,50 @@ export function parseFilename(filename: string): ParsedFilename {
 
   const parts = base.split('-')
 
-  // Try new 6-part format: CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE
-  if (parts.length >= 6) {
-    const clientName  = CLIENT_CODES[parts[0]] ?? null
-    const productName = PRODUCT_CODES[parts[1]] ?? null
-    const contentType = TYPE_CODES[parts[2]] ?? null
-    const postedBy    = CREATOR_CODES[parts[3]] ?? null
-    const title       = parts[4] ? toTitleCase(parts[4]) : null
-    const dateAdded   = parseDateCode(parts[5])
+  const clientName  = CLIENT_CODES[parts[0]] ?? null
+  const productName = PRODUCT_CODES[parts[1]] ?? null
+  const contentType = TYPE_CODES[parts[2]] ?? null
 
-    if (clientName && productName) {
-      return { clientName, productName, contentType, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
+  if (clientName && productName) {
+    // Detect whether part[3] is a STAGE code (new format) or CREATOR code (legacy)
+    const stageFromCode = STAGE_CODES[parts[3]] as Stage | undefined
+
+    if (stageFromCode) {
+      // ── New stage-aware format ─────────────────────────────────────────────
+      // CLIENT-PRODUCT-TYPE-STAGE-CREATOR-DATE          (6-part)
+      // CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE    (7-part)
+      const postedBy  = CREATOR_CODES[parts[4]] ?? null
+      const title     = parts.length >= 7 ? toTitleCase(parts[5]) : null
+      const dateAdded = parseDateCode(parts.length >= 7 ? parts[6] : parts[5])
+      return { clientName, productName, contentType, stage: stageFromCode, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
-  }
 
-  // Try legacy 5-part format: CLIENT-PRODUCT-TYPE-CREATOR-DATE
-  if (parts.length >= 4) {
-    const clientName  = CLIENT_CODES[parts[0]] ?? null
-    const productName = PRODUCT_CODES[parts[1]] ?? null
-    const contentType = TYPE_CODES[parts[2]] ?? null
-    const postedBy    = CREATOR_CODES[parts[3]] ?? null
-    const dateAdded   = parseDateCode(parts[4])
+    // ── Legacy formats (no explicit stage code) ────────────────────────────
+    // CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE  (6-part)
+    // CLIENT-PRODUCT-TYPE-CREATOR-DATE        (5-part)
+    const postedBy = CREATOR_CODES[parts[3]] ?? null
 
-    if (clientName && productName) {
-      return { clientName, productName, contentType, postedBy, title: null, dateAdded, hasCaption, confidence: 'high' }
+    if (parts.length >= 6) {
+      const title     = toTitleCase(parts[4])
+      const dateAdded = parseDateCode(parts[5])
+      return { clientName, productName, contentType, stage: null, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
+
+    const dateAdded = parseDateCode(parts[4])
+    return { clientName, productName, contentType, stage: null, postedBy, title: null, dateAdded, hasCaption, confidence: 'high' }
   }
 
   // Fallback: try to find a client code anywhere in the filename
-  let clientName: string | null = null
+  let fallbackClient: string | null = null
   for (const [code, name] of Object.entries(CLIENT_CODES)) {
-    if (base.includes(code)) { clientName = name; break }
+    if (base.includes(code)) { fallbackClient = name; break }
   }
 
   return {
-    clientName,
+    clientName: fallbackClient,
     productName: null,
     contentType: null,
+    stage: null,
     postedBy: null,
     title: null,
     dateAdded: extractDateFromFilename(base),

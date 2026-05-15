@@ -282,7 +282,8 @@ export async function POST(req: NextRequest) {
       productId = fallback.id
     }
 
-    const stage = inferStage(fileName, parsed.contentType)
+    // Use explicit stage code from filename (AWA/CON/CVR) if present; otherwise infer from content
+    const stage = parsed.stage ?? inferStage(fileName, parsed.contentType)
 
     const asset = {
       client_id: clientId,
