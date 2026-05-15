@@ -199,9 +199,9 @@ export default function HowToUsePage() {
       <section className="mb-10">
         <h2 className="text-lg font-bold text-gray-900 mb-3">File Naming Convention</h2>
         <div className="bg-gray-900 text-green-400 font-mono text-sm rounded-lg px-5 py-4 mb-3">
-          CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE.mp4
+          CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE.mp4
         </div>
-        <p className="text-sm text-gray-500 mb-2">Example: <code className="bg-gray-100 px-1.5 py-0.5 rounded">CHOMPS-SMK-UGC-AWA-LR-SummerHook-050626.mp4</code> = Chomps · Smokey BBQ Beef · UGC · Awareness · Libby Ragole · Summer Hook · May 6, 2026</p>
+        <p className="text-sm text-gray-500 mb-2">Example: <code className="bg-gray-100 px-1.5 py-0.5 rounded">CHOMPS-SMK-AWA-LR-SummerHook-050626.mp4</code> = Chomps · Smokey BBQ Beef · Awareness · Libby Ragole · Summer Hook · May 6, 2026</p>
         <p className="text-xs text-gray-400 mb-1">Date format: MMDDYY &nbsp;·&nbsp; Add <code className="bg-gray-100 px-1">-CAPTIONS</code> before the extension if a caption file is included</p>
         <p className="text-xs text-gray-400">Title should be a short descriptive slug with no spaces — use camel case or underscores (e.g. <code className="bg-gray-100 px-1">SummerHook</code>, <code className="bg-gray-100 px-1">BBQ_Snack</code>)</p>
       </section>
@@ -235,7 +235,10 @@ export default function HowToUsePage() {
       <section className="mb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold">Content Type Codes</div>
+            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold flex items-center justify-between">
+                <span>Content Type Codes</span>
+                <span className="text-xs text-gray-400 font-normal">legacy reference</span>
+              </div>
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
                 {TYPE_CODES.map(t => (

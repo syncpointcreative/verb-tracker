@@ -1,12 +1,13 @@
 /**
  * Parses a filename using the Asset Tracker naming convention:
  *
- * STANDARD (stage-aware, required going forward):
- *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE[.ext]  (7-part)
- *   e.g. CHOMPS-SMK-UGC-AWA-LR-SummerHook-050626.mp4
+ * STANDARD (current, no TYPE):
+ *   CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE[.ext]       (6-part)
+ *   e.g. CHOMPS-SMK-AWA-LR-SummerHook-050626.mp4
  *
- * LEGACY (still supported, no stage code):
- *   CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]        (6-part)
+ * LEGACY (still supported):
+ *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE[.ext]  (7-part, with TYPE)
+ *   CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]        (6-part, no stage)
  *   CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]              (5-part)
  *   e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
  */
@@ -34,31 +35,40 @@ export function parseFilename(filename: string): ParsedFilename {
 
   const clientName  = CLIENT_CODES[parts[0]] ?? null
   const productName = PRODUCT_CODES[parts[1]] ?? null
-  const contentType = TYPE_CODES[parts[2]] ?? null
 
   if (clientName && productName) {
-    // Detect whether part[3] is a STAGE code (new format) or CREATOR code (legacy)
-    const stageFromCode = STAGE_CODES[parts[3]] as Stage | undefined
+    // ── Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE ─────────
+    // Detected when parts[2] is a STAGE code (AWA/CON/CVR)
+    const stageAtPos2 = STAGE_CODES[parts[2]] as Stage | undefined
+    if (stageAtPos2) {
+      const postedBy  = CREATOR_CODES[parts[3]] ?? null
+      const title     = parts[4] ? toTitleCase(parts[4]) : null
+      const dateAdded = parseDateCode(parts[5])
+      return { clientName, productName, contentType: null, stage: stageAtPos2, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
+    }
 
-    if (stageFromCode) {
-      // ── Standard format: CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE ─────
+    // ── Legacy formats (parts[2] is a TYPE code) ───────────────────────────
+    const contentType = TYPE_CODES[parts[2]] ?? null
+
+    // Legacy 7-part: CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE
+    const stageAtPos3 = STAGE_CODES[parts[3]] as Stage | undefined
+    if (stageAtPos3) {
       const postedBy  = CREATOR_CODES[parts[4]] ?? null
       const title     = parts[5] ? toTitleCase(parts[5]) : null
       const dateAdded = parseDateCode(parts[6])
-      return { clientName, productName, contentType, stage: stageFromCode, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
+      return { clientName, productName, contentType, stage: stageAtPos3, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
 
-    // ── Legacy formats (no explicit stage code) ────────────────────────────
-    // CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE  (6-part)
-    // CLIENT-PRODUCT-TYPE-CREATOR-DATE        (5-part)
-    const postedBy = CREATOR_CODES[parts[3]] ?? null
-
+    // Legacy 6-part: CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE
     if (parts.length >= 6) {
+      const postedBy  = CREATOR_CODES[parts[3]] ?? null
       const title     = toTitleCase(parts[4])
       const dateAdded = parseDateCode(parts[5])
       return { clientName, productName, contentType, stage: null, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
 
+    // Legacy 5-part: CLIENT-PRODUCT-TYPE-CREATOR-DATE
+    const postedBy  = CREATOR_CODES[parts[3]] ?? null
     const dateAdded = parseDateCode(parts[4])
     return { clientName, productName, contentType, stage: null, postedBy, title: null, dateAdded, hasCaption, confidence: 'high' }
   }
