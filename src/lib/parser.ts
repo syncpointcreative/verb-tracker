@@ -1,12 +1,11 @@
 /**
- * Parses a filename using the VERB naming convention:
+ * Parses a filename using the Asset Tracker naming convention:
  *
- * NEW (stage-aware):
- *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-DATE[.ext]        (6-part)
+ * STANDARD (stage-aware, required going forward):
  *   CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE[.ext]  (7-part)
- *   e.g. CHOMPS-SMK-UGC-AWA-LR-050626.mp4
+ *   e.g. CHOMPS-SMK-UGC-AWA-LR-SummerHook-050626.mp4
  *
- * LEGACY (still supported):
+ * LEGACY (still supported, no stage code):
  *   CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]        (6-part)
  *   CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]              (5-part)
  *   e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
@@ -42,12 +41,10 @@ export function parseFilename(filename: string): ParsedFilename {
     const stageFromCode = STAGE_CODES[parts[3]] as Stage | undefined
 
     if (stageFromCode) {
-      // ── New stage-aware format ─────────────────────────────────────────────
-      // CLIENT-PRODUCT-TYPE-STAGE-CREATOR-DATE          (6-part)
-      // CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE    (7-part)
+      // ── Standard format: CLIENT-PRODUCT-TYPE-STAGE-CREATOR-TITLE-DATE ─────
       const postedBy  = CREATOR_CODES[parts[4]] ?? null
-      const title     = parts.length >= 7 ? toTitleCase(parts[5]) : null
-      const dateAdded = parseDateCode(parts.length >= 7 ? parts[6] : parts[5])
+      const title     = parts[5] ? toTitleCase(parts[5]) : null
+      const dateAdded = parseDateCode(parts[6])
       return { clientName, productName, contentType, stage: stageFromCode, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
 
