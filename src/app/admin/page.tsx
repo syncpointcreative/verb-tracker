@@ -34,7 +34,7 @@ export default function AdminPage() {
   const [loading, setLoading]       = useState(true)
   const [tab, setTab]               = useState<'deliveries' | 'assets' | 'add' | 'downloads'>('deliveries')
   const [driveQueue, setDriveQueue] = useState<Array<{
-    id: string; file_name: string; client_name: string; status: string; created_at: string; drive_url: string | null
+    id: string; file_name: string; client_name: string; status: string; created_at: string; drive_url: string | null; downloaded_at: string | null
   }>>([])
   const [saving, setSaving]         = useState<string | null>(null)
   const [toast, setToast]           = useState<string | null>(null)
@@ -131,6 +131,12 @@ export default function AdminPage() {
     await fetch(`/api/assets?id=${id}`, { method: 'DELETE' })
     showToast('Deleted ✓')
     setAssets(prev => prev.filter(a => a.id !== id))
+  }
+
+  // ── Mark downloaded ───────────────────────────────────────────────────────────
+  const markDownloaded = async (id: string) => {
+    setDriveQueue(prev => prev.map(i => i.id === id ? { ...i, downloaded_at: new Date().toISOString() } : i))
+    await fetch(`/api/drive-queue?id=${id}`, { method: 'PATCH' })
   }
 
   // ── Add asset form ────────────────────────────────────────────────────────────
@@ -496,8 +502,16 @@ export default function AdminPage() {
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">No results match your filters</td></tr>
                   )}
                   {filtered.map(item => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{item.file_name}</td>
+                    <tr key={item.id} className={`hover:bg-gray-50 ${item.downloaded_at ? 'bg-stone-50/60' : ''}`}>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-700">
+                        <div className="flex items-center gap-2">
+                          {item.downloaded_at && (
+                            <span title={`Downloaded ${new Date(item.downloaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}`}
+                              className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold">✓</span>
+                          )}
+                          <span className={item.downloaded_at ? 'text-gray-400' : ''}>{item.file_name}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 text-gray-600">{item.client_name}</td>
                       <td className="px-4 py-2.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -507,15 +521,25 @@ export default function AdminPage() {
                         }`}>{item.status}</span>
                       </td>
                       <td className="px-4 py-2.5 text-gray-400 text-xs">
-                        {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        <div>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                        {item.downloaded_at && (
+                          <div className="text-emerald-600 mt-0.5">
+                            ↓ {new Date(item.downloaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2.5">
                         <a
                           href={`/api/download?id=${item.id}`}
                           download={item.file_name}
-                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100"
+                          onClick={() => markDownloaded(item.id)}
+                          className={`text-xs font-semibold px-3 py-1 rounded-lg transition-colors ${
+                            item.downloaded_at
+                              ? 'text-gray-400 bg-gray-100 hover:bg-gray-200'
+                              : 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100'
+                          }`}
                         >
-                          ↓ Download
+                          {item.downloaded_at ? '↓ Again' : '↓ Download'}
                         </a>
                       </td>
                     </tr>
