@@ -18,14 +18,18 @@ export async function GET(req: NextRequest) {
   if (!file) return NextResponse.json({ error: 'Missing ?file=' }, { status: 400 })
 
   const supabase = createServerClient()
-  const { data: item } = await supabase
+  // Include ALL rows regardless of drive sync status — the Slack URL is
+  // still valid even if the Google Drive upload errored. Prefer done/pending
+  // rows first, but fall back to error rows so previews still work.
+  const { data: items } = await supabase
     .from('drive_queue')
     .select('id, url_private_download, mimetype, status')
     .eq('file_name', file)
-    .not('status', 'eq', 'error')   // skip rows that errored out
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(5)
+
+  // Prefer a non-error row if one exists
+  const item = items?.find(r => r.status !== 'error') ?? items?.[0] ?? null
 
   if (!item) {
     if (metaOnly) return NextResponse.json({ available: false })

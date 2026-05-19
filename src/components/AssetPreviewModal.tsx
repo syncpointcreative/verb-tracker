@@ -107,12 +107,16 @@ export function AssetPreviewModal({
               <p className="text-stone-400 text-sm mb-1">
                 {meta.available
                   ? 'Preview not available for this file type'
-                  : 'File not yet in the download queue'}
+                  : fileName
+                    ? 'File not found in Slack queue'
+                    : 'No file attached to this asset'}
               </p>
-              <p className="text-stone-600 text-xs mb-5">
+              <p className="text-stone-500 text-xs mb-5">
                 {meta.available
                   ? 'Download the file to view it locally.'
-                  : 'This asset was added manually or hasn\'t been approved in Slack yet.'}
+                  : fileName
+                    ? 'This asset\'s status was set manually — it wasn\'t routed through the Slack ✅ approval flow, so no file was queued.'
+                    : 'This asset was added manually without a file. View it directly in Slack if available.'}
               </p>
               {slackLink && (
                 <a
