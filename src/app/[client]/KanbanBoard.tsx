@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
+import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Props {
   assets: Asset[]
@@ -200,9 +201,10 @@ interface CardProps {
   asset: Asset
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
+  onPreview: (asset: Asset) => void
 }
 
-function AssetCard({ asset, onStatusChange, onPullRequest }: CardProps) {
+function AssetCard({ asset, onStatusChange, onPullRequest, onPreview }: CardProps) {
   const product = asset.product as Product | null
   const cfg = STATUS_CONFIG[asset.status]
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -244,10 +246,15 @@ function AssetCard({ asset, onStatusChange, onPullRequest }: CardProps) {
         <FreshnessPill asset={asset} />
       </div>
 
-      {/* Asset name */}
-      <p className="font-serif text-base font-light text-[#2B3428] leading-snug mb-1 group-hover:text-[#3a4636] transition-colors">
+      {/* Asset name — click to preview */}
+      <button
+        onClick={() => onPreview(asset)}
+        className="text-left font-serif text-base font-light text-[#2B3428] leading-snug mb-1 hover:text-[#C4A263] transition-colors w-full group/name"
+        title="Click to preview"
+      >
         {asset.asset_name || '—'}
-      </p>
+        <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1.5 align-middle transition-opacity">▶</span>
+      </button>
 
       {/* Product */}
       {product && (
@@ -299,11 +306,13 @@ function KanbanColumn({
   assets,
   onStatusChange,
   onPullRequest,
+  onPreview,
 }: {
   stage: Stage
   assets: Asset[]
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
+  onPreview: (asset: Asset) => void
 }) {
   const col = COLUMN[stage]
 
@@ -334,6 +343,7 @@ function KanbanColumn({
               asset={asset}
               onStatusChange={onStatusChange}
               onPullRequest={onPullRequest}
+              onPreview={onPreview}
             />
           ))
         )}
@@ -432,6 +442,7 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
   const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus ?? null)
   const [mobileStage, setMobileStage]   = useState<Stage>('Awareness')
   const [pullTarget, setPullTarget]     = useState<Asset | null>(null)
+  const [previewTarget, setPreviewTarget] = useState<Asset | null>(null)
   const [toast, setToast]               = useState<string | null>(null)
 
   // Keep local state in sync if the parent re-renders with new data
@@ -532,6 +543,14 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
         </div>
       )}
 
+      {/* Preview Modal */}
+      {previewTarget && (
+        <AssetPreviewModal
+          asset={previewTarget}
+          onClose={() => setPreviewTarget(null)}
+        />
+      )}
+
       {/* Pull Modal */}
       {pullTarget && (
         <PullModal
@@ -563,6 +582,7 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
             assets={byStage[stage]}
             onStatusChange={handleStatusChange}
             onPullRequest={setPullTarget}
+            onPreview={setPreviewTarget}
           />
         ))}
       </div>
@@ -598,6 +618,7 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
           assets={byStage[mobileStage]}
           onStatusChange={handleStatusChange}
           onPullRequest={setPullTarget}
+          onPreview={setPreviewTarget}
         />
       </div>
     </div>

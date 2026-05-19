@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
+import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -238,10 +239,11 @@ interface Props {
 }
 
 export default function AssetTable({ assets, products }: Props) {
-  const [editMode, setEditMode] = useState(false)
-  const [pending, setPending]   = useState<Record<string, PendingChange>>({})
-  const [saving, setSaving]     = useState(false)
-  const [savedMsg, setSavedMsg] = useState(false)
+  const [editMode, setEditMode]       = useState(false)
+  const [pending, setPending]         = useState<Record<string, PendingChange>>({})
+  const [saving, setSaving]           = useState(false)
+  const [savedMsg, setSavedMsg]       = useState(false)
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
 
   const [searchQuery,          setSearchQuery]          = useState('')
   const [selectedProductId,    setSelectedProductId]    = useState<string>('')
@@ -374,7 +376,14 @@ export default function AssetTable({ assets, products }: Props) {
 
         {/* Asset Name + content type stacked */}
         <td className="px-3 py-2">
-          <div className="font-medium text-sm text-stone-900 leading-tight">{asset.asset_name}</div>
+          <button
+            onClick={() => setPreviewAsset(asset)}
+            className="font-medium text-sm text-stone-900 leading-tight text-left hover:text-[#C4A263] transition-colors group/name"
+            title="Click to preview"
+          >
+            {asset.asset_name}
+            <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1 transition-opacity">▶</span>
+          </button>
           {editMode ? (
             <select value={curType ?? ''} onChange={e => setPendingField(asset.id, 'content_type', e.target.value || null)}
               className="mt-1 w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
@@ -435,6 +444,14 @@ export default function AssetTable({ assets, products }: Props) {
 
   return (
     <div>
+
+      {/* Preview Modal */}
+      {previewAsset && (
+        <AssetPreviewModal
+          asset={previewAsset}
+          onClose={() => setPreviewAsset(null)}
+        />
+      )}
 
       {/* ── Status summary strip ── */}
       <div className="flex flex-wrap gap-2 mb-4">
