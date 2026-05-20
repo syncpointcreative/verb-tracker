@@ -339,17 +339,34 @@ export default function AssetTable({ assets, products }: Props) {
   const handleStatusChange = async (assetId: string, newStatus: AssetStatus) => {
     const asset = localAssets.find(a => a.id === assetId)
     const body: Record<string, string> = { status: newStatus }
-    // Only stamp date_live on first-ever go-live. Resuming from Paused keeps the original date.
-    if (newStatus === 'Live / Running' && !asset?.date_live) {
-      body.date_live = new Date().toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0]
+
+    if (newStatus === 'Live / Running') {
+      if (asset?.status === 'Pulled') {
+        // Reactivation: restart freshness; server will handle first_live preservation
+        body.date_live = today
+      } else if (!asset?.date_live) {
+        // First ever go-live
+        body.date_live = today
+      }
+      // Resuming from Paused: leave date_live unchanged
     }
+
+    // Optimistic update — server response will carry first_live if set
     setLocalAssets(prev => prev.map(a =>
       a.id === assetId ? { ...a, status: newStatus, ...(body.date_live ? { date_live: body.date_live } : {}) } : a
     ))
-    await fetch(`/api/assets?id=${assetId}`, {
+    const res = await fetch(`/api/assets?id=${assetId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    if (res.ok) {
+      const updated = await res.json()
+      // Merge server response to pick up first_live and any other auto-stamped fields
+      setLocalAssets(prev => prev.map(a =>
+        a.id === assetId ? { ...updated, product: a.product, client: a.client } : a
+      ))
+    }
   }
 
   // ── Shared row renderer ──────────────────────────────────────────────────────
@@ -429,7 +446,14 @@ export default function AssetTable({ assets, products }: Props) {
         </td>
 
         {/* Freshness */}
-        <td className="px-3 py-2"><FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} /></td>
+        <td className="px-3 py-2">
+          <FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} />
+          {asset.first_live && (
+            <div className="text-[9px] text-stone-300 italic mt-0.5">
+              First live {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+            </div>
+          )}
+        </td>
 
         {/* Stage (edit mode only) */}
         {editMode && (

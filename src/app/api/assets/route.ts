@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   // Whitelist updatable fields
-  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only']
+  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'first_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -117,12 +117,27 @@ export async function PATCH(req: NextRequest) {
     updates.status_changed_at = new Date().toISOString()
   }
 
-  // Auto-stamp date_live when status first changes to "Live / Running" (not when resuming from Paused)
+  // Stamp date_live when going Live / Running
   if (updates.status === 'Live / Running' && !('date_live' in body)) {
-    const { data: existing } = await supabase.from('assets').select('date_live').eq('id', id).single()
-    if (!existing?.date_live) {
-      updates.date_live = new Date().toISOString().split('T')[0]
+    const { data: existing } = await supabase
+      .from('assets')
+      .select('status, date_live, first_live')
+      .eq('id', id)
+      .single()
+
+    const today = new Date().toISOString().split('T')[0]
+
+    if (existing?.status === 'Pulled') {
+      // Reactivation: preserve the original go-live date in first_live, restart freshness
+      if (existing.date_live && !existing.first_live) {
+        updates.first_live = existing.date_live
+      }
+      updates.date_live = today
+    } else if (!existing?.date_live) {
+      // First time going live — just stamp date_live
+      updates.date_live = today
     }
+    // Resuming from Paused: leave date_live unchanged (freshness continues uninterrupted)
   }
 
   const { data, error } = await supabase

@@ -357,9 +357,16 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, on
           </span>
         )}
         {asset.date_live ? (
-          <span className="text-[10px] text-stone-400 ml-auto">
-            Live {new Date(asset.date_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
+          <div className="flex flex-col items-end ml-auto gap-0.5">
+            <span className="text-[10px] text-stone-400">
+              Live {new Date(asset.date_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+            {asset.first_live && (
+              <span className="text-[9px] text-stone-300 italic">
+                First live {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+              </span>
+            )}
+          </div>
         ) : showLiveDatePrompt ? (
           <span className="text-[10px] text-stone-300 ml-auto italic">ready to upload</span>
         ) : null}

@@ -31,6 +31,7 @@ export interface Asset {
   status: AssetStatus
   date_added: string | null
   date_live: string | null
+  first_live: string | null  // original go-live date — set when asset is reactivated from Pulled
   posted_by: string | null
   notes: string | null
   slack_message_ts: string | null

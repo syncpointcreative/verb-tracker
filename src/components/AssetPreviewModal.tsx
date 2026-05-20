@@ -178,6 +178,13 @@ export function AssetPreviewModal({
                 })}
               </span>
             )}
+            {asset.first_live && (
+              <span className="text-[11px] text-stone-400 italic">
+                First live {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: '2-digit',
+                })}
+              </span>
+            )}
             {asset.performance && (
               <span className="text-[11px] text-stone-400 italic">
                 {asset.performance === 'High Performer' && '🔥 '}
