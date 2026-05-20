@@ -42,10 +42,12 @@ async function countNewAssets(
   // Count only Slack-submitted assets (slack_message_ts IS NOT NULL).
   // Manually-entered assets are backfills already captured in the baseline.
   // Use created_at (submission timestamp) so filename dates don't affect bucketing.
+  // Exclude ad_only assets (✔️ reaction) — approved for ads but not billed as deliverables.
   const { count } = await supabase
     .from('assets')
     .select('id', { count: 'exact', head: true })
     .eq('client_id', clientId)
+    .eq('ad_only', false)
     .not('slack_message_ts', 'is', null)
     .gte('created_at', periodStart)
     .lt('created_at', periodEnd)

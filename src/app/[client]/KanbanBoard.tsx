@@ -137,6 +137,76 @@ function PullModal({
   )
 }
 
+// ── Approval Modal ────────────────────────────────────────────────────────────
+
+function ApprovalModal({
+  asset,
+  onConfirm,
+  onCancel,
+}: {
+  asset: Asset
+  onConfirm: (adOnly: boolean) => void
+  onCancel: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+
+  async function choose(adOnly: boolean) {
+    setSaving(true)
+    await onConfirm(adOnly)
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+          <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Approve asset</p>
+          <p className="font-serif text-white text-base leading-snug line-clamp-2">{asset.asset_name}</p>
+        </div>
+
+        <div className="px-5 py-5">
+          <p className="text-xs text-stone-500 mb-4 leading-relaxed">
+            Does this asset count toward the monthly delivery total, or is it approved for ads use only?
+          </p>
+
+          <div className="flex flex-col gap-2.5 mb-5">
+            {/* Ads + Counter */}
+            <button
+              onClick={() => choose(false)}
+              disabled={saving}
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#2B3428] bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50"
+            >
+              <div className="font-medium text-sm mb-0.5">✅ Ads + Counter</div>
+              <div className="text-[11px] text-white/60">Approved for ads and counts toward the monthly total</div>
+            </button>
+
+            {/* Ads Only */}
+            <button
+              onClick={() => choose(true)}
+              disabled={saving}
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-stone-200 text-stone-700 hover:border-stone-300 hover:bg-stone-50 transition-colors disabled:opacity-50"
+            >
+              <div className="font-medium text-sm mb-0.5">✔️ Ads Only</div>
+              <div className="text-[11px] text-stone-400">Approved for ads but does not count toward the monthly total</div>
+            </button>
+          </div>
+
+          <button
+            onClick={onCancel}
+            className="w-full text-xs py-2 text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Status Dropdown ───────────────────────────────────────────────────────────
 
 const ALL_STATUSES: AssetStatus[] = [
@@ -201,10 +271,11 @@ interface CardProps {
   asset: Asset
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
+  onApprovalRequest: (asset: Asset) => void
   onPreview: (asset: Asset) => void
 }
 
-function AssetCard({ asset, onStatusChange, onPullRequest, onPreview }: CardProps) {
+function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, onPreview }: CardProps) {
   const product = asset.product as Product | null
   const cfg = STATUS_CONFIG[asset.status]
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -213,6 +284,9 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onPreview }: CardProp
     setDropdownOpen(false)
     if (s === 'Pulled') {
       onPullRequest(asset)
+    } else if (s === 'Ready to Upload' && asset.status === 'Pending Review') {
+      // Intercept: ask whether this counts toward the monthly counter
+      onApprovalRequest(asset)
     } else {
       onStatusChange(asset.id, s)
     }
@@ -243,7 +317,14 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onPreview }: CardProp
             />
           )}
         </div>
-        <FreshnessPill asset={asset} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {asset.ad_only && (
+            <span className="text-[9px] font-semibold tracking-wide text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5 uppercase">
+              Ads Only
+            </span>
+          )}
+          <FreshnessPill asset={asset} />
+        </div>
       </div>
 
       {/* Asset name — click to preview */}
@@ -306,12 +387,14 @@ function KanbanColumn({
   assets,
   onStatusChange,
   onPullRequest,
+  onApprovalRequest,
   onPreview,
 }: {
   stage: Stage
   assets: Asset[]
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
+  onApprovalRequest: (asset: Asset) => void
   onPreview: (asset: Asset) => void
 }) {
   const col = COLUMN[stage]
@@ -343,6 +426,7 @@ function KanbanColumn({
               asset={asset}
               onStatusChange={onStatusChange}
               onPullRequest={onPullRequest}
+              onApprovalRequest={onApprovalRequest}
               onPreview={onPreview}
             />
           ))
@@ -441,9 +525,10 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
   const [localAssets, setLocalAssets]   = useState<Asset[]>(initialAssets)
   const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus ?? null)
   const [mobileStage, setMobileStage]   = useState<Stage>('Awareness')
-  const [pullTarget, setPullTarget]     = useState<Asset | null>(null)
-  const [previewTarget, setPreviewTarget] = useState<Asset | null>(null)
-  const [toast, setToast]               = useState<string | null>(null)
+  const [pullTarget, setPullTarget]         = useState<Asset | null>(null)
+  const [approvalTarget, setApprovalTarget] = useState<Asset | null>(null)
+  const [previewTarget, setPreviewTarget]   = useState<Asset | null>(null)
+  const [toast, setToast]                   = useState<string | null>(null)
 
   // Keep local state in sync if the parent re-renders with new data
   useEffect(() => { setLocalAssets(initialAssets) }, [initialAssets])
@@ -477,6 +562,32 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
       showToast('Update failed — please try again')
     }
   }, [])
+
+  // ── Approve from app (with counter choice) ──────────────────────────────
+  const handleApproval = useCallback(async (adOnly: boolean) => {
+    if (!approvalTarget) return
+    const id = approvalTarget.id
+
+    setLocalAssets(prev =>
+      prev.map(a => a.id === id ? { ...a, status: 'Ready to Upload', ad_only: adOnly } : a)
+    )
+    setApprovalTarget(null)
+
+    try {
+      const res = await fetch(`/api/assets?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Ready to Upload', ad_only: adOnly }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const updated: Asset = await res.json()
+      setLocalAssets(prev => prev.map(a => a.id === id ? { ...updated, product: a.product, client: a.client } : a))
+      showToast(adOnly ? 'Approved — Ads Only ✔️' : 'Approved — Ads + Counter ✅')
+    } catch {
+      setLocalAssets(prev => prev.map(a => a.id === id ? { ...a, status: 'Pending Review' } : a))
+      showToast('Approval failed — please try again')
+    }
+  }, [approvalTarget])
 
   // ── Pull with performance rating ─────────────────────────────────────────
   const handlePull = useCallback(async (performance: Performance | null, notes: string) => {
@@ -551,6 +662,15 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
         />
       )}
 
+      {/* Approval Modal */}
+      {approvalTarget && (
+        <ApprovalModal
+          asset={approvalTarget}
+          onConfirm={handleApproval}
+          onCancel={() => setApprovalTarget(null)}
+        />
+      )}
+
       {/* Pull Modal */}
       {pullTarget && (
         <PullModal
@@ -582,6 +702,7 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
             assets={byStage[stage]}
             onStatusChange={handleStatusChange}
             onPullRequest={setPullTarget}
+            onApprovalRequest={setApprovalTarget}
             onPreview={setPreviewTarget}
           />
         ))}
@@ -618,6 +739,7 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
           assets={byStage[mobileStage]}
           onStatusChange={handleStatusChange}
           onPullRequest={setPullTarget}
+          onApprovalRequest={setApprovalTarget}
           onPreview={setPreviewTarget}
         />
       </div>

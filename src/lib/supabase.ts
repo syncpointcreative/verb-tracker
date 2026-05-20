@@ -35,6 +35,9 @@ export interface Asset {
   notes: string | null
   slack_message_ts: string | null
   slack_channel_id: string | null
+  slack_file_url:   string | null   // url_private_download stored at ingest — enables preview before ✅ approval
+  slack_mimetype:   string | null
+  ad_only:          boolean         // true = approved for ads but excluded from monthly asset counter (✔️ reaction)
   status_changed_at: string | null
   performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
   created_at: string

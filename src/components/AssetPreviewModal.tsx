@@ -5,8 +5,8 @@ import type { Asset } from '@/lib/supabase'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
 interface PreviewMeta {
-  available:      boolean
-  mimetype?:      string
+  available:       boolean
+  mimetype?:       string
   drive_queue_id?: string
 }
 
@@ -25,20 +25,34 @@ export function AssetPreviewModal({
 }) {
   const [meta, setMeta] = useState<PreviewMeta | null>(null)
 
-  const fileName  = asset.file_name
   const slackLink = slackMessageUrl(asset.slack_message_ts)
-  const previewUrl = fileName
-    ? `/api/preview?file=${encodeURIComponent(fileName)}`
-    : null
+
+  // Always use asset_id path when the asset has a Slack message timestamp —
+  // the API will look up slack_file_url from the DB, or fall back to a live
+  // Slack API call for assets ingested before that field was added.
+  // Only fall back to the legacy file= path for manually-added assets with no
+  // Slack message at all.
+  const isSlackAsset = Boolean(asset.slack_message_ts)
+  const previewUrl = isSlackAsset
+    ? `/api/preview?asset_id=${encodeURIComponent(asset.id)}`
+    : asset.file_name
+      ? `/api/preview?file=${encodeURIComponent(asset.file_name)}`
+      : null
+
+  const metaUrl = isSlackAsset
+    ? `/api/preview?asset_id=${encodeURIComponent(asset.id)}&meta=1`
+    : asset.file_name
+      ? `/api/preview?file=${encodeURIComponent(asset.file_name)}&meta=1`
+      : null
 
   useEffect(() => {
-    if (!fileName) { setMeta({ available: false }); return }
+    if (!metaUrl) { setMeta({ available: false }); return }
 
-    fetch(`/api/preview?file=${encodeURIComponent(fileName)}&meta=1`)
+    fetch(metaUrl)
       .then(r => r.json())
       .then((data: PreviewMeta) => setMeta(data))
       .catch(() => setMeta({ available: false }))
-  }, [fileName])
+  }, [metaUrl])
 
   // Keyboard close
   useEffect(() => {
@@ -49,6 +63,10 @@ export function AssetPreviewModal({
 
   const isVideo = meta?.mimetype?.startsWith('video/')
   const isImage = meta?.mimetype?.startsWith('image/')
+
+  // Download button only appears once the file is in the drive_queue
+  // (meaning Libby has ✅-approved it and it went through the upload flow)
+  const canDownload = Boolean(meta?.drive_queue_id)
 
   return (
     <div
@@ -65,8 +83,8 @@ export function AssetPreviewModal({
             <p className="font-serif text-white text-base leading-snug truncate">
               {asset.asset_name}
             </p>
-            {fileName && (
-              <p className="text-[10px] text-white/30 font-mono mt-0.5 truncate">{fileName}</p>
+            {asset.file_name && (
+              <p className="text-[10px] text-white/30 font-mono mt-0.5 truncate">{asset.file_name}</p>
             )}
           </div>
           <button
@@ -76,6 +94,14 @@ export function AssetPreviewModal({
             ✕
           </button>
         </div>
+
+        {/* Status badge for Pending Review */}
+        {asset.status === 'Pending Review' && (
+          <div className="bg-amber-50 border-b border-amber-100 px-5 py-2 flex items-center gap-2">
+            <span className="text-amber-600 text-xs font-medium">⏳ Pending Review</span>
+            <span className="text-amber-500 text-xs">— Preview only. Download available after approval.</span>
+          </div>
+        )}
 
         {/* Preview area */}
         <div className="flex-1 overflow-auto bg-stone-950 flex items-center justify-center min-h-[220px]">
@@ -99,7 +125,7 @@ export function AssetPreviewModal({
             />
 
           ) : (
-            /* No file in queue or unsupported type */
+            /* No file available or unsupported type */
             <div className="text-center px-8 py-12">
               <div className="text-4xl mb-3 opacity-30">
                 {meta.available ? '📄' : '🔍'}
@@ -107,15 +133,15 @@ export function AssetPreviewModal({
               <p className="text-stone-400 text-sm mb-1">
                 {meta.available
                   ? 'Preview not available for this file type'
-                  : fileName
-                    ? 'File not found in Slack queue'
+                  : isSlackAsset
+                    ? 'File preview unavailable'
                     : 'No file attached to this asset'}
               </p>
               <p className="text-stone-500 text-xs mb-5">
                 {meta.available
                   ? 'Download the file to view it locally.'
-                  : fileName
-                    ? 'This asset\'s status was set manually — it wasn\'t routed through the Slack ✅ approval flow, so no file was queued.'
+                  : isSlackAsset
+                    ? 'The Slack file link may have expired. View the original post in Slack.'
                     : 'This asset was added manually without a file. View it directly in Slack if available.'}
               </p>
               {slackLink && (
@@ -174,9 +200,9 @@ export function AssetPreviewModal({
                 Slack ↗
               </a>
             )}
-            {meta?.drive_queue_id && (
+            {canDownload && (
               <a
-                href={`/api/download?id=${meta.drive_queue_id}`}
+                href={`/api/download?id=${meta!.drive_queue_id}`}
                 download
                 className="text-[11px] font-medium text-white bg-[#2B3428] hover:bg-[#3a4636] px-3 py-1.5 rounded-lg transition-colors"
               >

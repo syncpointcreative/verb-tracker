@@ -164,17 +164,46 @@ export async function POST(req: NextRequest) {
 
     if (userId === LIBBY_USER_ID && itemChannel === SLACK_CHANNEL_ID && messageTs) {
       if (reaction === 'white_check_mark') {
-        // ✅ — approve: queue files for Drive upload
+        // ✅ — approve for ads + counts toward monthly asset counter
         await queueApprovedFiles(messageTs)
 
-        // Also promote asset from Pending Review → Ready to Upload
         const supabase = createServerClient()
         await supabase
           .from('assets')
-          .update({ status: 'Ready to Upload' })
+          .update({ status: 'Ready to Upload', ad_only: false })
           .eq('slack_message_ts', messageTs)
           .eq('slack_channel_id', SLACK_CHANNEL_ID)
           .eq('status', 'Pending Review')
+
+        // Refresh delivered count (ad_only=false so this asset counts)
+        const { data: affected } = await supabase
+          .from('assets')
+          .select('client_id')
+          .eq('slack_message_ts', messageTs)
+          .eq('slack_channel_id', SLACK_CHANNEL_ID)
+          .limit(1)
+        if (affected?.[0]) {
+          const { data: clientRow } = await supabase
+            .from('clients')
+            .select('billing_day')
+            .eq('id', affected[0].client_id)
+            .single()
+          await refreshDeliveredCount(supabase, affected[0].client_id, clientRow?.billing_day ?? 1)
+        }
+
+      } else if (reaction === 'heavy_check_mark') {
+        // ✔️ — approve for ads ONLY (does not count toward monthly asset counter)
+        await queueApprovedFiles(messageTs)
+
+        const supabase = createServerClient()
+        await supabase
+          .from('assets')
+          .update({ status: 'Ready to Upload', ad_only: true })
+          .eq('slack_message_ts', messageTs)
+          .eq('slack_channel_id', SLACK_CHANNEL_ID)
+          .eq('status', 'Pending Review')
+
+        // No refreshDeliveredCount — ad_only assets are excluded from the counter
 
       } else if (reaction === 'x') {
         // ❌ — reject: mark assets removed + cancel any pending Drive queue entries
@@ -234,20 +263,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Collect file names from the event
-  const fileNames: string[] = []
+  // Collect files from the event (name + Slack URL + mimetype)
+  interface SlackFile { name: string; url: string | null; mimetype: string | null }
+  const slackFiles: SlackFile[] = []
 
   if (event.type === 'message' && event.files) {
-    for (const f of event.files as Array<{ name?: string }>) {
-      if (f.name) fileNames.push(f.name)
+    for (const f of event.files as Array<{ name?: string; url_private_download?: string; mimetype?: string }>) {
+      if (f.name) slackFiles.push({
+        name:     f.name,
+        url:      f.url_private_download ?? null,
+        mimetype: f.mimetype ?? null,
+      })
     }
   } else if (event.type === 'file_shared' && event.file_id) {
-    // For file_shared events we only have the file ID; name must be in event.file
     const file = event.file as Record<string, unknown> | undefined
-    if (file?.name) fileNames.push(file.name as string)
+    if (file?.name) slackFiles.push({
+      name:     file.name as string,
+      url:      (file.url_private_download as string) ?? null,
+      mimetype: (file.mimetype as string) ?? null,
+    })
   }
 
-  if (!fileNames.length) return NextResponse.json({ ok: true })
+  if (!slackFiles.length) return NextResponse.json({ ok: true })
 
   const supabase = createServerClient()
 
@@ -263,7 +300,9 @@ export async function POST(req: NextRequest) {
 
   let added = 0
 
-  for (const fileName of fileNames) {
+  for (const slackFile of slackFiles) {
+    const { name: fileName, url: slackFileUrl, mimetype: slackMimetype } = slackFile
+
     const parsed = parseFilename(fileName)
     if (!parsed.clientName) continue // can't assign without a client
 
@@ -300,6 +339,9 @@ export async function POST(req: NextRequest) {
       notes: parsed.confidence === 'low' ? 'Auto-detected (low confidence — please verify)' : null,
       slack_message_ts: slackTs ?? null,
       slack_channel_id: SLACK_CHANNEL_ID,
+      // Store Slack file URL at ingest so we can preview before ✅ approval
+      slack_file_url:  slackFileUrl,
+      slack_mimetype:  slackMimetype,
     }
 
     // Upsert by file_name + client to avoid duplicates on re-delivery
@@ -317,9 +359,9 @@ export async function POST(req: NextRequest) {
 
   // Log the pull
   await supabase.from('slack_pulls').insert({
-    assets_found: fileNames.length,
+    assets_found: slackFiles.length,
     assets_added: added,
-    notes: `Webhook ingest — ${fileNames.join(', ')}`,
+    notes: `Webhook ingest — ${slackFiles.map(f => f.name).join(', ')}`,
   })
 
   return NextResponse.json({ ok: true, added })

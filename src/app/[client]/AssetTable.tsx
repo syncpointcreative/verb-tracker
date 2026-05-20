@@ -376,14 +376,21 @@ export default function AssetTable({ assets, products }: Props) {
 
         {/* Asset Name + content type stacked */}
         <td className="px-3 py-2">
-          <button
-            onClick={() => setPreviewAsset(asset)}
-            className="font-medium text-sm text-stone-900 leading-tight text-left hover:text-[#C4A263] transition-colors group/name"
-            title="Click to preview"
-          >
-            {asset.asset_name}
-            <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1 transition-opacity">▶</span>
-          </button>
+          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+            <button
+              onClick={() => setPreviewAsset(asset)}
+              className="font-medium text-sm text-stone-900 leading-tight text-left hover:text-[#C4A263] transition-colors group/name"
+              title="Click to preview"
+            >
+              {asset.asset_name}
+              <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1 transition-opacity">▶</span>
+            </button>
+            {asset.ad_only && (
+              <span className="text-[9px] font-semibold tracking-wide text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-1.5 py-0.5 uppercase flex-shrink-0">
+                Ads Only
+              </span>
+            )}
+          </div>
           {editMode ? (
             <select value={curType ?? ''} onChange={e => setPendingField(asset.id, 'content_type', e.target.value || null)}
               className="mt-1 w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
