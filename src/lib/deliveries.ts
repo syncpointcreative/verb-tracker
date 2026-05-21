@@ -5,14 +5,16 @@
  *   - billingDay defaults to 1 (calendar month). Pass 19 for FaceTub-style periods.
  *   - Counts assets by created_at (when submitted to the system), not date_added (filename date).
  *   - The April baseline already accounts for pre-system content; no launch-date cutoff needed.
- *   - Caps delivered at quota; overflows roll into the next billing period.
+ *   - Caps delivered at quota; overflows roll forward through as many periods as needed.
  *   - Safe to run multiple times — always recalculates from the fixed baseline.
+ *   - MAX_LOOKAHEAD_MONTHS caps how far forward we propagate (prevents infinite loops).
  */
 import { SupabaseClient } from '@supabase/supabase-js'
 
+const MAX_LOOKAHEAD_MONTHS = 12
+
 /** Returns "YYYY-MM-DD" for the given year, month (1-indexed), and day. */
 function periodStr(year: number, month: number, day: number): string {
-  // Handle month overflow (e.g. month=13 → year+1, month=1)
   const d = new Date(year, month - 1, day)
   return d.toISOString().split('T')[0]
 }
@@ -23,7 +25,6 @@ function getCurrentPeriodYM(billingDay: number, now: Date): { year: number; mont
   if (today >= billingDay) {
     return { year: now.getFullYear(), month: now.getMonth() + 1 }
   }
-  // Haven't reached billing day yet — period started last month
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   return { year: prev.getFullYear(), month: prev.getMonth() + 1 }
 }
@@ -60,60 +61,70 @@ export async function refreshDeliveredCount(
   billingDay = 1
 ) {
   try {
-    const now = new Date()
-    const curYM   = getCurrentPeriodYM(billingDay, now)
-    const nextYM  = addMonthsToYM(curYM, 1)
-    const afterYM = addMonthsToYM(curYM, 2)
-
-    const curStart   = periodStr(curYM.year,   curYM.month,   billingDay)
-    const nextStart  = periodStr(nextYM.year,  nextYM.month,  billingDay)
-    const afterStart = periodStr(afterYM.year, afterYM.month, billingDay)
+    const now   = new Date()
+    const curYM = getCurrentPeriodYM(billingDay, now)
 
     // ── Current period ─────────────────────────────────────────────────────────
-    const curAssets = await countNewAssets(supabase, clientId, curStart, nextStart)
+    const periodStart = periodStr(curYM.year, curYM.month, billingDay)
+    const periodEnd   = periodStr(addMonthsToYM(curYM, 1).year, addMonthsToYM(curYM, 1).month, billingDay)
 
     const { data: curRow } = await supabase
       .from('monthly_deliveries')
       .select('quota, baseline_delivered')
       .eq('client_id', clientId)
-      .eq('month', curStart)
+      .eq('month', periodStart)
       .single()
 
-    const curBaseline  = curRow?.baseline_delivered ?? 0
-    const quota        = curRow?.quota ?? 30
-    const raw          = curBaseline + curAssets
+    const curBaseline = curRow?.baseline_delivered ?? 0
+    const quota       = curRow?.quota ?? 30
+    const curAssets   = await countNewAssets(supabase, clientId, periodStart, periodEnd)
+    const raw         = curBaseline + curAssets
     const curDelivered = Math.min(raw, quota)
-    const overflow     = Math.max(0, raw - quota)
+    let   overflow    = Math.max(0, raw - quota)
 
     await supabase.from('monthly_deliveries').upsert({
       client_id:          clientId,
-      month:              curStart,
+      month:              periodStart,
       quota,
       baseline_delivered: curBaseline,
       delivered:          curDelivered,
     }, { onConflict: 'client_id,month' })
 
-    // ── Next period: carry overflow only ───────────────────────────────────────
-    const { data: nextRow } = await supabase
-      .from('monthly_deliveries')
-      .select('quota, baseline_delivered')
-      .eq('client_id', clientId)
-      .eq('month', nextStart)
-      .single()
+    // ── Future periods: roll overflow forward until it drains ─────────────────
+    // We also update any future periods that already have a row (e.g. manually-set
+    // quotas or baselines) even if overflow is zero.
+    for (let i = 1; i <= MAX_LOOKAHEAD_MONTHS; i++) {
+      const futureYM    = addMonthsToYM(curYM, i)
+      const futureStart = periodStr(futureYM.year, futureYM.month, billingDay)
+      const futureEnd   = periodStr(addMonthsToYM(futureYM, 1).year, addMonthsToYM(futureYM, 1).month, billingDay)
 
-    if (nextRow || overflow > 0) {
-      const nextBaseline  = nextRow?.baseline_delivered ?? 0
-      const nextQuota     = nextRow?.quota ?? quota
-      const nextAssets    = await countNewAssets(supabase, clientId, nextStart, afterStart)
-      const nextDelivered = Math.min(nextBaseline + nextAssets + overflow, nextQuota)
+      const { data: futureRow } = await supabase
+        .from('monthly_deliveries')
+        .select('quota, baseline_delivered')
+        .eq('client_id', clientId)
+        .eq('month', futureStart)
+        .single()
+
+      // Stop if there's no overflow left AND no existing row to update
+      if (overflow === 0 && !futureRow) break
+
+      const futureBaseline  = futureRow?.baseline_delivered ?? 0
+      const futureQuota     = futureRow?.quota ?? quota
+      const futureAssets    = await countNewAssets(supabase, clientId, futureStart, futureEnd)
+      const futureRaw       = futureBaseline + futureAssets + overflow
+      const futureDelivered = Math.min(futureRaw, futureQuota)
+      const nextOverflow    = Math.max(0, futureRaw - futureQuota)
 
       await supabase.from('monthly_deliveries').upsert({
         client_id:          clientId,
-        month:              nextStart,
-        quota:              nextQuota,
-        baseline_delivered: nextBaseline,
-        delivered:          nextDelivered,
+        month:              futureStart,
+        quota:              futureQuota,
+        baseline_delivered: futureBaseline,
+        delivered:          futureDelivered,
       }, { onConflict: 'client_id,month' })
+
+      overflow = nextOverflow
+      if (overflow === 0 && !futureRow) break
     }
   } catch (err) {
     console.error('refreshDeliveredCount error:', err)
