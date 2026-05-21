@@ -8,49 +8,39 @@ const supabase = createClient(
 )
 
 // POST /api/deliveries/sync
-// Re-counts assets for every client this month, applies quota cap, and rolls
-// any overflow into next month's baseline_delivered automatically.
-// Defaults to current month if year/month not provided.
-export async function POST(req: Request) {
+// Re-counts assets for ALL clients, respecting each client's billing_day.
+// Applies quota cap and rolls overflow forward through as many months as needed.
+// Accepts no body — always syncs every client as of now.
+export async function POST() {
   try {
-    const body = await req.json().catch(() => ({}))
+    // Fetch all clients with their billing_day so each is calculated correctly.
+    // FaceTub (billing_day=19) and calendar-month clients (billing_day=1) both work.
+    const { data: clients, error: clientErr } = await supabase
+      .from('clients')
+      .select('id, name, billing_day')
+      .order('name')
 
-    const now   = new Date()
-    const year  = body.year  ?? now.getFullYear()
-    const month = body.month ?? now.getMonth() + 1  // 1-indexed
-
-    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-
-    // Get all clients that have a delivery row for this month
-    const { data: existing, error: existErr } = await supabase
-      .from('monthly_deliveries')
-      .select('client_id')
-      .eq('month', monthStart)
-
-    if (existErr) throw existErr
-
-    if (!existing || existing.length === 0) {
-      return NextResponse.json({
-        synced: 0,
-        message: `No delivery rows found for ${monthStart.slice(0, 7)} — add clients first via Admin.`,
-      })
+    if (clientErr) throw clientErr
+    if (!clients || clients.length === 0) {
+      return NextResponse.json({ synced: 0, message: 'No clients found.' })
     }
 
-    // Refresh each client using shared logic (includes quota cap + rollover)
-    const clientIds = [...new Set(existing.map(r => r.client_id))]
-    await Promise.all(clientIds.map(id => refreshDeliveredCount(supabase, id)))
-
-    // Return updated rows for confirmation
-    const { data: updated } = await supabase
-      .from('monthly_deliveries')
-      .select('client_id, month, delivered, quota, baseline_delivered')
-      .eq('month', monthStart)
+    // Run each client's refresh sequentially to avoid DB contention on upserts.
+    const results: { name: string; id: string; billingDay: number; ok: boolean; error?: string }[] = []
+    for (const client of clients) {
+      try {
+        await refreshDeliveredCount(supabase, client.id, client.billing_day ?? 1)
+        results.push({ name: client.name, id: client.id, billingDay: client.billing_day ?? 1, ok: true })
+      } catch (err) {
+        results.push({ name: client.name, id: client.id, billingDay: client.billing_day ?? 1, ok: false, error: String(err) })
+      }
+    }
 
     return NextResponse.json({
-      synced: clientIds.length,
-      month: monthStart.slice(0, 7),
-      message: `Synced ${clientIds.length} client(s) for ${monthStart.slice(0, 7)}`,
-      results: updated,
+      synced:  results.filter(r => r.ok).length,
+      failed:  results.filter(r => !r.ok).length,
+      message: `Synced ${results.filter(r => r.ok).length} of ${clients.length} client(s)`,
+      results,
     })
   } catch (err: unknown) {
     console.error('Sync deliveries error:', err)
