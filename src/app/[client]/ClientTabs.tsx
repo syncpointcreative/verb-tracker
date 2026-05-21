@@ -11,9 +11,13 @@ import type { Stage } from '@/lib/supabase'
 interface BriefSection { id: string; title: string; content: string; sort_order: number }
 interface MissingItem { product: Product; stage: Stage; reason: 'aging' | 'missing' }
 
+interface Campaign { id: string; name: string }
+
 interface Props {
   assets: Asset[]
   products: Product[]
+  campaigns: Campaign[]
+  clientId: string
   briefSections: BriefSection[]
   missingCoverage: MissingItem[]
   initialStatus?: string | null
@@ -23,7 +27,7 @@ const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 
 type Tab = 'board' | 'assets' | 'archive' | 'brief'
 
-export default function ClientTabs({ assets, products, briefSections, missingCoverage, initialStatus }: Props) {
+export default function ClientTabs({ assets, products, campaigns, clientId, briefSections, missingCoverage, initialStatus }: Props) {
   const [tab, setTab]           = useState<Tab>('board')
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -89,7 +93,7 @@ export default function ClientTabs({ assets, products, briefSections, missingCov
       {/* Board tab — Kanban view */}
       {tab === 'board' && (
         <>
-          <KanbanBoard assets={activeAssets} initialStatus={initialStatus} />
+          <KanbanBoard assets={activeAssets} campaigns={campaigns} clientId={clientId} initialStatus={initialStatus} />
 
           {/* Missing coverage panel below the board */}
           {missingCoverage.length > 0 && (

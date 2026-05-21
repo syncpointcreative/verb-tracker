@@ -6,8 +6,12 @@ import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
+interface Campaign { id: string; name: string }
+
 interface Props {
   assets: Asset[]
+  campaigns: Campaign[]
+  clientId: string
   initialStatus?: string | null
 }
 
@@ -265,20 +269,99 @@ function StatusDropdown({
   )
 }
 
+// ── Campaign Picker ───────────────────────────────────────────────────────────
+
+function CampaignPicker({
+  asset,
+  campaigns,
+  onToggle,
+  onClose,
+}: {
+  asset: Asset
+  campaigns: Campaign[]
+  onToggle: (name: string) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [newName, setNewName] = useState('')
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const assigned = new Set(asset.campaigns ?? [])
+
+  return (
+    <div
+      ref={ref}
+      className="absolute top-full left-0 mt-1 z-30 bg-white border border-stone-200 rounded-xl shadow-xl py-1.5 min-w-[200px] max-w-[240px]"
+      onClick={e => e.stopPropagation()}
+    >
+      <p className="text-[9px] font-semibold tracking-widest text-stone-400 uppercase px-3 pb-1 pt-0.5">Campaigns</p>
+      {campaigns.length === 0 ? (
+        <p className="text-[11px] text-stone-300 px-3 py-1 italic">No campaigns yet</p>
+      ) : (
+        campaigns.map(c => {
+          const active = assigned.has(c.name)
+          return (
+            <button
+              key={c.id}
+              onClick={() => onToggle(c.name)}
+              className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-stone-50 ${active ? 'text-indigo-700' : 'text-stone-600'}`}
+            >
+              <span className={`w-3 h-3 rounded flex items-center justify-center border flex-shrink-0 transition-colors ${active ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-stone-300'}`}>
+                {active && <span className="text-[8px] leading-none">✓</span>}
+              </span>
+              <span className="truncate">{c.name}</span>
+            </button>
+          )
+        })
+      )}
+      <div className="border-t border-stone-100 mt-1 pt-1 px-2">
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            if (newName.trim()) { onToggle(newName.trim()); setNewName('') }
+          }}
+          className="flex items-center gap-1"
+        >
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="New campaign…"
+            className="flex-1 text-[11px] border border-stone-200 rounded-md px-2 py-1 focus:outline-none focus:border-indigo-400 placeholder:text-stone-300 min-w-0"
+          />
+          <button
+            type="submit"
+            className="text-[11px] px-2 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex-shrink-0"
+          >+</button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Asset Card ────────────────────────────────────────────────────────────────
 
 interface CardProps {
   asset: Asset
+  campaigns: Campaign[]
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
   onApprovalRequest: (asset: Asset) => void
+  onCampaignToggle: (id: string, campaignName: string) => void
   onPreview: (asset: Asset) => void
 }
 
-function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, onPreview }: CardProps) {
+function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApprovalRequest, onCampaignToggle, onPreview }: CardProps) {
   const product = asset.product as Product | null
   const cfg = STATUS_CONFIG[asset.status]
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [campaignOpen, setCampaignOpen] = useState(false)
 
   function handleStatusSelect(s: AssetStatus) {
     setDropdownOpen(false)
@@ -294,11 +377,13 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, on
 
   const showLiveDatePrompt = asset.status === 'Ready to Upload'
 
+  const assignedCampaigns = asset.campaigns ?? []
+
   return (
     <div className="bg-[#F5F1EB] border border-stone-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-stone-300 transition-all group">
-      {/* Status row */}
-      <div className="flex items-start justify-between gap-2 mb-2.5">
-        {/* Clickable status badge → dropdown */}
+
+      {/* Row 1: Status + Freshness */}
+      <div className="flex items-start justify-between gap-2 mb-2">
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setDropdownOpen(v => !v)}
@@ -327,62 +412,77 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, on
         </div>
       </div>
 
-      {/* Asset name — click to preview */}
+      {/* Row 2: Asset name */}
       <button
         onClick={() => onPreview(asset)}
-        className="text-left font-serif text-base font-light text-[#2B3428] leading-snug mb-1 hover:text-[#C4A263] transition-colors w-full group/name"
+        className="text-left font-serif text-base font-light text-[#2B3428] leading-snug mb-1.5 hover:text-[#C4A263] transition-colors w-full group/name"
         title="Click to preview"
       >
         {asset.asset_name || '—'}
         <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1.5 align-middle transition-opacity">▶</span>
       </button>
 
-      {/* Product */}
-      {product && (
-        <p className="text-[11px] text-[#C4A263] tracking-wide mb-2.5 truncate">
-          {product.name}
-        </p>
-      )}
+      {/* Row 3: Campaign tags */}
+      <div className="relative flex items-center gap-1 flex-wrap mb-2">
+        {assignedCampaigns.map(name => (
+          <span key={name} className="inline-flex items-center gap-1 text-[9px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5">
+            {name}
+          </span>
+        ))}
+        <button
+          onClick={() => setCampaignOpen(v => !v)}
+          className="text-[9px] text-stone-400 hover:text-indigo-600 transition-colors px-1.5 py-0.5 rounded-full hover:bg-indigo-50 border border-transparent hover:border-indigo-200"
+          title="Assign campaigns"
+        >
+          {assignedCampaigns.length === 0 ? '+ campaign' : '+'}
+        </button>
+        {campaignOpen && (
+          <CampaignPicker
+            asset={asset}
+            campaigns={campaigns}
+            onToggle={name => onCampaignToggle(asset.id, name)}
+            onClose={() => setCampaignOpen(false)}
+          />
+        )}
+      </div>
 
-      {/* Meta row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {asset.content_type && (
-          <span className="text-[10px] text-stone-500 bg-stone-100 rounded-md px-1.5 py-0.5 tracking-wide">
-            {asset.content_type}
-          </span>
-        )}
-        {asset.posted_by && (
-          <span className="text-[10px] text-stone-400 truncate">
-            {asset.posted_by}
-          </span>
-        )}
-        {asset.date_live ? (
-          <div className="flex flex-col items-end ml-auto gap-0.5">
-            <span className="text-[10px] text-stone-400">
-              Live {new Date(asset.date_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-            {asset.first_live && (
-              <span className="text-[9px] text-stone-300 italic">
-                First live {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+      {/* Row 4: Product + meta + dates */}
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          {product && (
+            <p className="text-[11px] text-[#C4A263] tracking-wide truncate mb-1">{product.name}</p>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {asset.content_type && (
+              <span className="text-[10px] text-stone-500 bg-stone-100 rounded-md px-1.5 py-0.5">{asset.content_type}</span>
+            )}
+            {asset.posted_by && (
+              <span className="text-[10px] text-stone-400 truncate">{asset.posted_by}</span>
+            )}
+            {asset.performance && (
+              <span className="text-[10px] text-stone-400 italic">
+                {asset.performance === 'High Performer' ? '🔥' : asset.performance === 'Average Performer' ? '👍' : '❌'}
               </span>
             )}
           </div>
-        ) : showLiveDatePrompt ? (
-          <span className="text-[10px] text-stone-300 ml-auto italic">ready to upload</span>
-        ) : null}
-      </div>
-
-      {/* Performance badge (shown on pulled assets) */}
-      {asset.performance && (
-        <div className="mt-2 pt-2 border-t border-stone-200/60">
-          <span className="text-[10px] text-stone-400 italic">
-            {asset.performance === 'High Performer' && '🔥 '}
-            {asset.performance === 'Average Performer' && '👍 '}
-            {asset.performance === 'Poor Performer' && '❌ '}
-            {asset.performance}
-          </span>
         </div>
-      )}
+        <div className="flex flex-col items-end flex-shrink-0">
+          {asset.date_live ? (
+            <>
+              <span className="text-[10px] text-stone-400">
+                Live {new Date(asset.date_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+              {asset.first_live && (
+                <span className="text-[9px] text-stone-300 italic">
+                  First {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                </span>
+              )}
+            </>
+          ) : showLiveDatePrompt ? (
+            <span className="text-[10px] text-stone-300 italic">ready</span>
+          ) : null}
+        </div>
+      </div>
     </div>
   )
 }
@@ -392,16 +492,20 @@ function AssetCard({ asset, onStatusChange, onPullRequest, onApprovalRequest, on
 function KanbanColumn({
   stage,
   assets,
+  campaigns,
   onStatusChange,
   onPullRequest,
   onApprovalRequest,
+  onCampaignToggle,
   onPreview,
 }: {
   stage: Stage
   assets: Asset[]
+  campaigns: Campaign[]
   onStatusChange: (id: string, newStatus: AssetStatus) => void
   onPullRequest: (asset: Asset) => void
   onApprovalRequest: (asset: Asset) => void
+  onCampaignToggle: (id: string, name: string) => void
   onPreview: (asset: Asset) => void
 }) {
   const col = COLUMN[stage]
@@ -431,9 +535,11 @@ function KanbanColumn({
             <AssetCard
               key={asset.id}
               asset={asset}
+              campaigns={campaigns}
               onStatusChange={onStatusChange}
               onPullRequest={onPullRequest}
               onApprovalRequest={onApprovalRequest}
+              onCampaignToggle={onCampaignToggle}
               onPreview={onPreview}
             />
           ))
@@ -528,10 +634,12 @@ function FilterBar({
 
 // ── Board ─────────────────────────────────────────────────────────────────────
 
-export default function KanbanBoard({ assets: initialAssets, initialStatus }: Props) {
-  const [localAssets, setLocalAssets]   = useState<Asset[]>(initialAssets)
-  const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus ?? null)
-  const [mobileStage, setMobileStage]   = useState<Stage>('Awareness')
+export default function KanbanBoard({ assets: initialAssets, campaigns: initialCampaigns, clientId, initialStatus }: Props) {
+  const [localAssets, setLocalAssets]       = useState<Asset[]>(initialAssets)
+  const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>(initialCampaigns)
+  const [statusFilter, setStatusFilter]     = useState<string | null>(initialStatus ?? null)
+  const [campaignFilter, setCampaignFilter] = useState<string | null>(null)
+  const [mobileStage, setMobileStage]       = useState<Stage>('Awareness')
   const [pullTarget, setPullTarget]         = useState<Asset | null>(null)
   const [approvalTarget, setApprovalTarget] = useState<Asset | null>(null)
   const [previewTarget, setPreviewTarget]   = useState<Asset | null>(null)
@@ -547,9 +655,25 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
 
   // ── Optimistic status update ─────────────────────────────────────────────
   const handleStatusChange = useCallback(async (id: string, newStatus: AssetStatus) => {
-    // Optimistically update local state
+    const today = new Date().toISOString().split('T')[0]
+    // Optimistically update local state — also reset date_live immediately
+    // for any Live/Running reactivation (except resuming from Paused) so the
+    // freshness pill updates before the server responds.
     setLocalAssets(prev =>
-      prev.map(a => a.id === id ? { ...a, status: newStatus } : a)
+      prev.map(a => {
+        if (a.id !== id) return a
+        const isReactivation = newStatus === 'Live / Running' && a.status !== 'Paused'
+        return {
+          ...a,
+          status: newStatus,
+          ...(isReactivation && a.date_live
+            ? { date_live: today, first_live: a.first_live ?? a.date_live }
+            : {}),
+          ...(isReactivation && !a.date_live
+            ? { date_live: today }
+            : {}),
+        }
+      })
     )
 
     try {
@@ -596,6 +720,41 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
     }
   }, [approvalTarget])
 
+  // ── Campaign toggle ──────────────────────────────────────────────────────
+  const handleCampaignToggle = useCallback(async (assetId: string, campaignName: string) => {
+    // If this campaign doesn't exist yet in client_campaigns, create it
+    if (!localCampaigns.find(c => c.name === campaignName)) {
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, name: campaignName }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setLocalCampaigns(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      }
+    }
+
+    // Toggle campaign on the asset
+    setLocalAssets(prev => prev.map(a => {
+      if (a.id !== assetId) return a
+      const current = new Set(a.campaigns ?? [])
+      if (current.has(campaignName)) {
+        current.delete(campaignName)
+      } else {
+        current.add(campaignName)
+      }
+      const updated = [...current]
+      // Fire-and-forget PATCH
+      fetch(`/api/assets?id=${assetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaigns: updated }),
+      })
+      return { ...a, campaigns: updated }
+    }))
+  }, [localCampaigns, clientId])
+
   // ── Pull with performance rating ─────────────────────────────────────────
   const handlePull = useCallback(async (performance: Performance | null, notes: string) => {
     if (!pullTarget) return
@@ -638,17 +797,20 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
   const staleCount = useMemo(() => localAssets.filter(isStale).length, [localAssets])
 
   const byStage = useMemo(() => {
-    const filtered = statusFilter === STALE_FILTER
+    let filtered = statusFilter === STALE_FILTER
       ? localAssets.filter(isStale)
       : statusFilter
         ? localAssets.filter(a => a.status === statusFilter)
         : localAssets
+    if (campaignFilter) {
+      filtered = filtered.filter(a => (a.campaigns ?? []).includes(campaignFilter))
+    }
     const grouped: Record<Stage, Asset[]> = { Awareness: [], Consideration: [], Conversion: [] }
     for (const a of filtered) {
       if (a.stage in grouped) grouped[a.stage as Stage].push(a)
     }
     return grouped
-  }, [localAssets, statusFilter])
+  }, [localAssets, statusFilter, campaignFilter])
 
   const totalFiltered = Object.values(byStage).reduce((n, arr) => n + arr.length, 0)
 
@@ -688,15 +850,37 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
       )}
 
       {/* Filter bar */}
-      <div className="mb-5">
+      <div className="mb-5 space-y-2">
         <FilterBar
           activeFilter={statusFilter}
           onFilter={setStatusFilter}
           counts={statusCounts}
           staleCount={staleCount}
         />
-        {statusFilter && totalFiltered === 0 && (
-          <p className="mt-3 text-xs text-stone-400">No assets match this filter.</p>
+        {/* Campaign filter chips */}
+        {localCampaigns.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-stone-400 tracking-wide">Campaign:</span>
+            {localCampaigns.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setCampaignFilter(campaignFilter === c.name ? null : c.name)}
+                className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
+                  campaignFilter === c.name
+                    ? 'bg-indigo-600 text-white border-transparent'
+                    : 'text-stone-500 border-stone-200 hover:border-indigo-300 hover:text-indigo-600 bg-white'
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+            {campaignFilter && (
+              <button onClick={() => setCampaignFilter(null)} className="text-[10px] text-stone-300 hover:text-stone-500 transition-colors">✕ clear</button>
+            )}
+          </div>
+        )}
+        {(statusFilter || campaignFilter) && totalFiltered === 0 && (
+          <p className="text-xs text-stone-400">No assets match this filter.</p>
         )}
       </div>
 
@@ -707,9 +891,11 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
             key={stage}
             stage={stage}
             assets={byStage[stage]}
+            campaigns={localCampaigns}
             onStatusChange={handleStatusChange}
             onPullRequest={setPullTarget}
             onApprovalRequest={setApprovalTarget}
+            onCampaignToggle={handleCampaignToggle}
             onPreview={setPreviewTarget}
           />
         ))}
@@ -744,9 +930,11 @@ export default function KanbanBoard({ assets: initialAssets, initialStatus }: Pr
         <KanbanColumn
           stage={mobileStage}
           assets={byStage[mobileStage]}
+          campaigns={localCampaigns}
           onStatusChange={handleStatusChange}
           onPullRequest={setPullTarget}
           onApprovalRequest={setApprovalTarget}
+          onCampaignToggle={handleCampaignToggle}
           onPreview={setPreviewTarget}
         />
       </div>

@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   // Whitelist updatable fields
-  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'first_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only']
+  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'first_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only', 'campaigns']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -117,7 +117,7 @@ export async function PATCH(req: NextRequest) {
     updates.status_changed_at = new Date().toISOString()
   }
 
-  // Stamp date_live when going Live / Running
+  // Stamp / reset date_live when going Live / Running
   if (updates.status === 'Live / Running' && !('date_live' in body)) {
     const { data: existing } = await supabase
       .from('assets')
@@ -127,17 +127,19 @@ export async function PATCH(req: NextRequest) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    if (existing?.status === 'Pulled') {
-      // Reactivation: preserve the original go-live date in first_live, restart freshness
-      if (existing.date_live && !existing.first_live) {
+    if (existing?.status === 'Paused') {
+      // Resuming from Paused — leave date_live unchanged so freshness continues
+    } else if (existing?.date_live) {
+      // Reactivation from any other status (Pulled, Live/Running, Needs Refresh, Expired…)
+      // Preserve the original go-live date in first_live, restart freshness to today
+      if (!existing.first_live) {
         updates.first_live = existing.date_live
       }
       updates.date_live = today
-    } else if (!existing?.date_live) {
-      // First time going live — just stamp date_live
+    } else {
+      // First time ever going live
       updates.date_live = today
     }
-    // Resuming from Paused: leave date_live unchanged (freshness continues uninterrupted)
   }
 
   const { data, error } = await supabase

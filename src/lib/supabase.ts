@@ -39,6 +39,7 @@ export interface Asset {
   slack_file_url:   string | null   // url_private_download stored at ingest — enables preview before ✅ approval
   slack_mimetype:   string | null
   ad_only:          boolean         // true = approved for ads but excluded from monthly asset counter (✔️ reaction)
+  campaigns:        string[]        // campaign tag names this asset is assigned to
   status_changed_at: string | null
   performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
   created_at: string

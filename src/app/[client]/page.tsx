@@ -24,19 +24,22 @@ export default async function ClientPage({ params, searchParams }: Props) {
 
   if (!client) notFound()
 
-  // Fetch products, assets, and brief sections in parallel
+  // Fetch products, assets, campaigns, and brief sections in parallel
   const [
     { data: products },
     { data: assets },
+    { data: campaignsRaw },
     { data: briefSectionsRaw },
   ] = await Promise.all([
     supabase.from('products').select('*').eq('client_id', client.id).order('sort_order'),
     supabase.from('assets').select('*, product:products(*)').eq('client_id', client.id).order('stage').order('date_added', { ascending: false }),
+    supabase.from('client_campaigns').select('id, name').eq('client_id', client.id).order('name'),
     supabase.from('brief_sections').select('id, title, content, sort_order').eq('client_id', client.id).order('sort_order'),
   ])
 
   const allAssets: Asset[] = assets ?? []
   const allProducts: Product[] = products ?? []
+  const allCampaigns: { id: string; name: string }[] = campaignsRaw ?? []
   const briefSections = briefSectionsRaw ?? []
 
   // Find missing product coverage
@@ -117,6 +120,8 @@ export default async function ClientPage({ params, searchParams }: Props) {
       <ClientTabs
         assets={allAssets}
         products={allProducts}
+        campaigns={allCampaigns}
+        clientId={client.id}
         briefSections={briefSections}
         missingCoverage={missingCoverage}
         initialStatus={searchParams.status ?? null}
