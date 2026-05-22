@@ -24,7 +24,7 @@ import { SLACK_CHANNEL_ID } from '@/lib/constants'
 import { refreshDeliveredCount } from '@/lib/deliveries'
 
 // Libby's Slack user ID — only her ✅ reactions trigger Drive upload
-const LIBBY_USER_ID = 'U072U0L0Y4V'
+const LIBBY_USER_ID = 'U0B608MGUPJ'
 
 // ─── Slack signature verification ────────────────────────────────────────────
 
