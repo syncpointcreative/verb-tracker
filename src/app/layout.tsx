@@ -14,13 +14,13 @@ const cormorant = Cormorant_Garamond({
 })
 
 export const metadata: Metadata = {
-  title: 'VERB — Content Tracker',
+  title: 'ELEVEN SIGNAL — Content Tracker',
   description: 'TikTok content asset tracker for SyncPoint Creative',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'VERB',
+    title: 'ELEVEN SIGNAL',
   },
   themeColor: '#2B3428',
   viewport: {
@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <aside className="hidden md:block flex-shrink-0">
             <Suspense fallback={
               <div className="w-56 bg-[#2B3428] h-screen flex items-start px-5 py-5">
-                <span className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">VERB</span>
+                <span style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" }} className="text-[#F5F1EB] text-xs tracking-[0.18em] font-semibold uppercase">ELEVEN SIGNAL</span>
               </div>
             }>
               <Sidebar />
@@ -57,8 +57,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {/* Mobile top nav */}
             <header className="md:hidden bg-[#2B3428] sticky top-0 z-50">
               <div className="flex items-center justify-between h-14 px-4">
-                <Link href="/" className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">
-                  VERB
+                <Link href="/" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" }} className="text-[#F5F1EB] text-xs tracking-[0.18em] font-semibold uppercase">
+                  ELEVEN SIGNAL
                 </Link>
                 <nav className="flex items-center gap-1">
                   {[

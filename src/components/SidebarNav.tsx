@@ -40,8 +40,12 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
 
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/10 flex-shrink-0">
-        <Link href="/" className="font-serif text-[#F5F1EB] text-xl tracking-[0.25em] font-light">
-          VERB
+        <Link
+          href="/"
+          style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" }}
+          className="text-[#F5F1EB] text-xs tracking-[0.18em] font-semibold uppercase"
+        >
+          ELEVEN SIGNAL
         </Link>
       </div>
 
