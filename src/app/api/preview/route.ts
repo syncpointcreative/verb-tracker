@@ -118,15 +118,22 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    if (!token) return NextResponse.json({ error: 'SLACK_BOT_TOKEN not set' }, { status: 500 })
+    // Detect whether this is a migrated Google Drive URL or a Slack URL.
+    // Drive URLs are publicly readable — no auth header needed.
+    const isDriveUrl = slackUrl.includes('drive.google.com') || slackUrl.includes('googleapis.com')
 
-    const slackRes = await fetch(slackUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    if (!isDriveUrl && !token) {
+      return NextResponse.json({ error: 'SLACK_BOT_TOKEN not set' }, { status: 500 })
+    }
+
+    const slackRes = await fetch(slackUrl, isDriveUrl
+      ? {}
+      : { headers: { Authorization: `Bearer ${token}` } }
+    )
 
     if (!slackRes.ok) {
       return NextResponse.json(
-        { error: `Slack fetch failed: ${slackRes.status}` },
+        { error: `${isDriveUrl ? 'Drive' : 'Slack'} fetch failed: ${slackRes.status}` },
         { status: 502 }
       )
     }
