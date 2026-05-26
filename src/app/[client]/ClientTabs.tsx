@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Asset, Product } from '@/lib/supabase'
+import type { Asset, AssetStatus, Product } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 import KanbanBoard from './KanbanBoard'
 import BriefPanel from './BriefPanel'
