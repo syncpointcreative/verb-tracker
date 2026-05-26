@@ -234,11 +234,12 @@ const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: stri
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
-  assets:   Asset[]
-  products: ClientProduct[]
+  assets:         Asset[]
+  products:       ClientProduct[]
+  onStatusChange?: (id: string, newStatus: AssetStatus, updatedAsset?: Asset) => void
 }
 
-export default function AssetTable({ assets, products }: Props) {
+export default function AssetTable({ assets, products, onStatusChange: notifyParent }: Props) {
   const [editMode, setEditMode]       = useState(false)
   const [pending, setPending]         = useState<Record<string, PendingChange>>({})
   const [saving, setSaving]           = useState(false)
@@ -366,6 +367,7 @@ export default function AssetTable({ assets, products }: Props) {
       setLocalAssets(prev => prev.map(a =>
         a.id === assetId ? { ...updated, product: a.product, client: a.client } : a
       ))
+      notifyParent?.(assetId, newStatus, updated)
     }
   }
 

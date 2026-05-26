@@ -13,6 +13,7 @@ interface Props {
   campaigns: Campaign[]
   clientId: string
   initialStatus?: string | null
+  onStatusChange?: (id: string, newStatus: AssetStatus, updatedAsset?: Asset) => void
 }
 
 // ── Freshness ────────────────────────────────────────────────────────────────
@@ -634,7 +635,7 @@ function FilterBar({
 
 // ── Board ─────────────────────────────────────────────────────────────────────
 
-export default function KanbanBoard({ assets: initialAssets, campaigns: initialCampaigns, clientId, initialStatus }: Props) {
+export default function KanbanBoard({ assets: initialAssets, campaigns: initialCampaigns, clientId, initialStatus, onStatusChange: notifyParent }: Props) {
   const [localAssets, setLocalAssets]       = useState<Asset[]>(initialAssets)
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>(initialCampaigns)
   const [statusFilter, setStatusFilter]     = useState<string | null>(initialStatus ?? null)
@@ -686,13 +687,14 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
       const updated: Asset = await res.json()
       // Merge the server response (gets date_live auto-stamp etc.)
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...updated, product: a.product, client: a.client } : a))
+      notifyParent?.(id, newStatus, updated)
       showToast(`Marked ${newStatus}`)
     } catch {
-      // Revert on failure
+      // Revert on failure — re-read current status from localAssets snapshot at call time
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...a, status: a.status } : a))
       showToast('Update failed — please try again')
     }
-  }, [])
+  }, [notifyParent])
 
   // ── Approve from app (with counter choice) ──────────────────────────────
   const handleApproval = useCallback(async (adOnly: boolean) => {

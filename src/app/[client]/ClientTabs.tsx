@@ -35,6 +35,16 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
   const activeAssets   = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
   const archivedAssets = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
 
+  // Shared status-change handler — keeps all tabs in sync without a page reload.
+  // Both KanbanBoard and AssetTable call this after a successful PATCH so that
+  // switching tabs never shows stale data.
+  const handleStatusChange = (id: string, _newStatus: AssetStatus, updatedAsset?: Asset) => {
+    setLocalAssets(prev => prev.map(a => {
+      if (a.id !== id) return a
+      return updatedAsset ? { ...updatedAsset, product: a.product, client: a.client } : { ...a, status: _newStatus }
+    }))
+  }
+
   const restoreAsset = async (asset: Asset) => {
     setRestoringId(asset.id)
     await fetch(`/api/assets?id=${asset.id}`, {
@@ -93,7 +103,7 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
       {/* Board tab — Kanban view */}
       {tab === 'board' && (
         <>
-          <KanbanBoard assets={activeAssets} campaigns={campaigns} clientId={clientId} initialStatus={initialStatus} />
+          <KanbanBoard assets={activeAssets} campaigns={campaigns} clientId={clientId} initialStatus={initialStatus} onStatusChange={handleStatusChange} />
 
           {/* Missing coverage panel below the board */}
           {missingCoverage.length > 0 && (
@@ -138,7 +148,7 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
 
       {/* Table tab — full AssetTable for editing */}
       {tab === 'assets' && (
-        <AssetTable assets={activeAssets} products={products} />
+        <AssetTable assets={activeAssets} products={products} onStatusChange={handleStatusChange} />
       )}
 
       {/* Archive tab */}
