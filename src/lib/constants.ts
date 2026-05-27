@@ -81,6 +81,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
   CCSD: 'Chili Crunch Sushi Dip',
   LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
+  VL: 'Vanilla Latte Protein',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
