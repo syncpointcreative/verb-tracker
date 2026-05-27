@@ -212,6 +212,82 @@ function ApprovalModal({
   )
 }
 
+// ── Freshness Reset Dialog ────────────────────────────────────────────────────
+
+function FreshnessResetDialog({
+  assetName,
+  existingDateLive,
+  onReset,
+  onKeep,
+  onCancel,
+}: {
+  assetName: string
+  existingDateLive: string
+  onReset: () => void
+  onKeep: () => void
+  onCancel: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+
+  const daysOld = Math.floor(
+    (Date.now() - new Date(existingDateLive + 'T12:00:00').getTime()) / 86_400_000
+  )
+
+  async function handle(action: () => void) {
+    setSaving(true)
+    action()
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+          <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Restore asset</p>
+          <p className="font-serif text-white text-base leading-snug line-clamp-2">{assetName}</p>
+        </div>
+
+        <div className="px-5 py-5">
+          <p className="text-xs text-stone-500 mb-1 leading-relaxed">
+            This asset was last live <span className="font-medium text-stone-700">{daysOld}d ago</span>. Reset its freshness counter?
+          </p>
+          <p className="text-[11px] text-stone-400 mb-4 leading-relaxed italic">
+            Resetting treats this as a brand-new run, so freshness starts at day 0.
+          </p>
+
+          <div className="flex flex-col gap-2.5 mb-5">
+            <button
+              onClick={() => handle(onReset)}
+              disabled={saving}
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#2B3428] bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50"
+            >
+              <div className="font-medium text-sm mb-0.5">🔄 Reset Freshness</div>
+              <div className="text-[11px] text-white/60">Start the freshness clock from today</div>
+            </button>
+
+            <button
+              onClick={() => handle(onKeep)}
+              disabled={saving}
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-stone-200 text-stone-700 hover:border-stone-300 hover:bg-stone-50 transition-colors disabled:opacity-50"
+            >
+              <div className="font-medium text-sm mb-0.5">⏳ Keep Existing</div>
+              <div className="text-[11px] text-stone-400">Continue from where it left off ({daysOld}d old)</div>
+            </button>
+          </div>
+
+          <button
+            onClick={onCancel}
+            className="w-full text-xs py-2 text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Status Dropdown ───────────────────────────────────────────────────────────
 
 const ALL_STATUSES: AssetStatus[] = [
@@ -644,6 +720,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
   const [pullTarget, setPullTarget]         = useState<Asset | null>(null)
   const [approvalTarget, setApprovalTarget] = useState<Asset | null>(null)
   const [previewTarget, setPreviewTarget]   = useState<Asset | null>(null)
+  const [freshnessTarget, setFreshnessTarget] = useState<{ id: string; assetName: string; existingDateLive: string } | null>(null)
   const [toast, setToast]                   = useState<string | null>(null)
 
   // Keep local state in sync if the parent re-renders with new data
@@ -657,7 +734,17 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
   // ── Optimistic status update ─────────────────────────────────────────────
   const handleStatusChange = useCallback(async (id: string, newStatus: AssetStatus) => {
     const today = new Date().toISOString().split('T')[0]
-    // Optimistically update local state — also reset date_live immediately
+
+    // Intercept Live/Running for assets that already have a date_live (not resuming from Paused)
+    if (newStatus === 'Live / Running') {
+      const asset = localAssets.find(a => a.id === id)
+      if (asset && asset.date_live && asset.status !== 'Paused') {
+        setFreshnessTarget({ id, assetName: asset.asset_name, existingDateLive: asset.date_live })
+        return
+      }
+    }
+
+    // Optimistically update local state — also stamp date_live immediately
     // for any Live/Running reactivation (except resuming from Paused) so the
     // freshness pill updates before the server responds.
     setLocalAssets(prev =>
@@ -690,11 +777,51 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
       notifyParent?.(id, newStatus, updated)
       showToast(`Marked ${newStatus}`)
     } catch {
-      // Revert on failure — re-read current status from localAssets snapshot at call time
+      // Revert on failure
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...a, status: a.status } : a))
       showToast('Update failed — please try again')
     }
-  }, [notifyParent])
+  }, [notifyParent, localAssets])
+
+  // ── Freshness reset confirm ──────────────────────────────────────────────
+  const handleFreshnessConfirm = useCallback(async (reset: boolean) => {
+    if (!freshnessTarget) return
+    const { id, existingDateLive } = freshnessTarget
+    const today = new Date().toISOString().split('T')[0]
+    const dateLive = reset ? today : existingDateLive
+
+    setFreshnessTarget(null)
+
+    // Optimistic update
+    setLocalAssets(prev =>
+      prev.map(a => {
+        if (a.id !== id) return a
+        return {
+          ...a,
+          status: 'Live / Running',
+          date_live: dateLive,
+          ...(reset ? { first_live: a.first_live ?? a.date_live } : {}),
+        }
+      })
+    )
+
+    try {
+      // Pass date_live explicitly so the server's auto-stamp logic is bypassed
+      const res = await fetch(`/api/assets?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Live / Running', date_live: dateLive }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const updated: Asset = await res.json()
+      setLocalAssets(prev => prev.map(a => a.id === id ? { ...updated, product: a.product, client: a.client } : a))
+      notifyParent?.(id, 'Live / Running', updated)
+      showToast(reset ? 'Freshness reset — clock starts today ✓' : 'Back live — keeping original date ✓')
+    } catch {
+      setLocalAssets(prev => prev.map(a => a.id === id ? { ...a, status: a.status } : a))
+      showToast('Update failed — please try again')
+    }
+  }, [freshnessTarget, notifyParent])
 
   // ── Approve from app (with counter choice) ──────────────────────────────
   const handleApproval = useCallback(async (adOnly: boolean) => {
@@ -839,6 +966,17 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
           asset={approvalTarget}
           onConfirm={handleApproval}
           onCancel={() => setApprovalTarget(null)}
+        />
+      )}
+
+      {/* Freshness Reset Dialog */}
+      {freshnessTarget && (
+        <FreshnessResetDialog
+          assetName={freshnessTarget.assetName}
+          existingDateLive={freshnessTarget.existingDateLive}
+          onReset={() => handleFreshnessConfirm(true)}
+          onKeep={() => handleFreshnessConfirm(false)}
+          onCancel={() => setFreshnessTarget(null)}
         />
       )}
 
