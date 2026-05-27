@@ -140,6 +140,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'SSVM', name: 'Sleep Support Vanilla Mint' },
       { code: 'LEM',  name: 'Lemonade' },
       { code: 'GLEM', name: 'Grapefruit Lemonade' },
+      { code: 'VL',   name: 'Vanilla Latte Protein' },
     ],
   },
   {
