@@ -842,12 +842,13 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
       if (!res.ok) throw new Error('Failed')
       const updated: Asset = await res.json()
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...updated, product: a.product, client: a.client } : a))
+      notifyParent?.(id, 'Ready to Upload', updated)
       showToast(adOnly ? 'Approved — Ads Only ✔️' : 'Approved — Ads + Counter ✅')
     } catch {
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...a, status: 'Pending Review' } : a))
       showToast('Approval failed — please try again')
     }
-  }, [approvalTarget])
+  }, [approvalTarget, notifyParent])
 
   // ── Campaign toggle ──────────────────────────────────────────────────────
   const handleCampaignToggle = useCallback(async (assetId: string, campaignName: string) => {
@@ -908,11 +909,12 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
       if (!res.ok) throw new Error('Failed')
       const updated: Asset = await res.json()
       setLocalAssets(prev => prev.map(a => a.id === id ? { ...updated, product: a.product, client: a.client } : a))
+      notifyParent?.(id, 'Pulled', updated)
       showToast('Asset pulled ✓')
     } catch {
       showToast('Pull failed — please try again')
     }
-  }, [pullTarget])
+  }, [pullTarget, notifyParent])
 
   // ── Counts + grouping ────────────────────────────────────────────────────
   const statusCounts = useMemo(() => {
