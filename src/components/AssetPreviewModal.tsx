@@ -146,17 +146,29 @@ export function AssetPreviewModal({
                     ? 'The Slack file link may have expired. View the original post in Slack.'
                     : 'This asset was added manually without a file. View it directly in Slack if available.'}
               </p>
-              {slackLink && (
-                <a
-                  href={slackLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-white bg-[#4A154B] hover:bg-[#5a256b] px-4 py-2 rounded-xl transition-colors"
-                >
-                  <span>View in Slack</span>
-                  <span className="text-xs opacity-60">↗</span>
-                </a>
-              )}
+              <div className="flex flex-col items-center gap-2">
+                {slackLink && (
+                  <a
+                    href={slackLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-white bg-[#4A154B] hover:bg-[#5a256b] px-4 py-2 rounded-xl transition-colors"
+                  >
+                    <span>View in Slack</span>
+                    <span className="text-xs opacity-60">↗</span>
+                  </a>
+                )}
+                {isSlackAsset && (
+                  <a
+                    href={`/api/preview?asset_id=${encodeURIComponent(asset.id)}&diag=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    🔍 Debug preview
+                  </a>
+                )}
+              </div>
             </div>
           )}
         </div>
