@@ -221,6 +221,17 @@ export function AssetPreviewModal({
                 Slack ↗
               </a>
             )}
+            {isSlackAsset && (
+              <a
+                href={`/api/preview?asset_id=${encodeURIComponent(asset.id)}&diag=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-stone-300 hover:text-stone-500 transition-colors"
+                title="Open diagnostic JSON — paste to Seth if video won't load"
+              >
+                🔍
+              </a>
+            )}
             {canDownload && (
               <a
                 href={`/api/download?id=${meta!.drive_queue_id}`}
