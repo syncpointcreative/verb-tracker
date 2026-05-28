@@ -6,7 +6,7 @@ import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
-interface Campaign { id: string; name: string }
+interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
 
 interface Props {
   assets: Asset[]

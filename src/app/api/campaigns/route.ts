@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('client_campaigns')
-    .select('id, name')
+    .select('id, name, tiktok_campaign_id')
     .eq('client_id', clientId)
     .order('name')
 
