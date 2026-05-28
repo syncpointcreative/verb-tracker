@@ -76,11 +76,15 @@ export async function listBoards(): Promise<MondayBoard[]> {
   return data.boards
 }
 
-/** Find a board whose name contains the search string (case-insensitive). */
+/** Find a board whose name contains the search string (case-insensitive).
+ *  Skips "Subitems of …" boards that Monday auto-creates alongside main boards. */
 export async function findBoardByName(search: string): Promise<MondayBoard | null> {
   const boards = await listBoards()
   const lower  = search.toLowerCase()
-  return boards.find(b => b.name.toLowerCase().includes(lower)) ?? null
+  return boards.find(b =>
+    !b.name.toLowerCase().startsWith('subitems of') &&
+    b.name.toLowerCase().includes(lower)
+  ) ?? null
 }
 
 // ── Group helpers ─────────────────────────────────────────────────────────────

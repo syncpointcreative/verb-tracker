@@ -31,7 +31,10 @@ export function parseFilename(filename: string): ParsedFilename {
   const base = filename.replace(/(\.[^.]+)+$/, '').toUpperCase()
   const hasCaption = base.includes('CAPTION')
 
-  const parts = base.split('-')
+  const parts     = base.split('-')
+  // Preserve original case so toTitleCase() can detect CamelCase word boundaries
+  // (e.g. "MorningFuel" → "Morning Fuel" instead of "M O R N I N G F U E L")
+  const origParts = filename.replace(/(\.[^.]+)+$/, '').split('-')
 
   const clientName  = CLIENT_CODES[parts[0]] ?? null
   const productName = PRODUCT_CODES[parts[1]] ?? null
@@ -42,7 +45,7 @@ export function parseFilename(filename: string): ParsedFilename {
     const stageAtPos2 = STAGE_CODES[parts[2]] as Stage | undefined
     if (stageAtPos2) {
       const postedBy  = CREATOR_CODES[parts[3]] ?? null
-      const title     = parts[4] ? toTitleCase(parts[4]) : null
+      const title     = origParts[4] ? toTitleCase(origParts[4]) : null
       const dateAdded = parseDateCode(parts[5])
       return { clientName, productName, contentType: null, stage: stageAtPos2, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
@@ -54,7 +57,7 @@ export function parseFilename(filename: string): ParsedFilename {
     const stageAtPos3 = STAGE_CODES[parts[3]] as Stage | undefined
     if (stageAtPos3) {
       const postedBy  = CREATOR_CODES[parts[4]] ?? null
-      const title     = parts[5] ? toTitleCase(parts[5]) : null
+      const title     = origParts[5] ? toTitleCase(origParts[5]) : null
       const dateAdded = parseDateCode(parts[6])
       return { clientName, productName, contentType, stage: stageAtPos3, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
@@ -62,7 +65,7 @@ export function parseFilename(filename: string): ParsedFilename {
     // Legacy 6-part: CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE
     if (parts.length >= 6) {
       const postedBy  = CREATOR_CODES[parts[3]] ?? null
-      const title     = toTitleCase(parts[4])
+      const title     = toTitleCase(origParts[4] ?? parts[4])
       const dateAdded = parseDateCode(parts[5])
       return { clientName, productName, contentType, stage: null, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
     }
