@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Asset } from '@/lib/supabase'
-import { SLACK_CHANNEL_ID } from '@/lib/constants'
+import { SLACK_CHANNEL_ID, SLACK_WORKSPACE_URL } from '@/lib/constants'
 
 interface PreviewMeta {
   available:       boolean
@@ -10,10 +10,12 @@ interface PreviewMeta {
   drive_queue_id?: string
 }
 
-function slackMessageUrl(ts: string | null): string | null {
+function slackMessageUrl(ts: string | null, channelId?: string | null): string | null {
   if (!ts) return null
-  // Slack web URL format: remove the dot from the timestamp
-  return `https://slack.com/archives/${SLACK_CHANNEL_ID}/p${ts.replace('.', '')}`
+  // Use workspace-specific URL so the link opens in Eleven Signal, not whatever
+  // workspace the user has active in their Slack app.
+  const channel = channelId ?? SLACK_CHANNEL_ID
+  return `${SLACK_WORKSPACE_URL}/archives/${channel}/p${ts.replace('.', '')}`
 }
 
 export function AssetPreviewModal({
@@ -25,7 +27,7 @@ export function AssetPreviewModal({
 }) {
   const [meta, setMeta] = useState<PreviewMeta | null>(null)
 
-  const slackLink = slackMessageUrl(asset.slack_message_ts)
+  const slackLink = slackMessageUrl(asset.slack_message_ts, asset.slack_channel_id)
 
   // Always use asset_id path when the asset has a Slack message timestamp —
   // the API will look up slack_file_url from the DB, or fall back to a live

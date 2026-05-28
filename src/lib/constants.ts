@@ -50,6 +50,9 @@ export const TARGET_ASSETS_PER_STAGE = 3
 export const EXPIRY_DAYS = 14        // assets ≤14 days (Fresh/Monitor) = covered; 15+ (Refresh Soon) = needs new creative
 export const REFRESH_SOON_DAYS = 15  // day threshold that triggers Refresh Soon + Slack alert
 export const SLACK_CHANNEL_ID = 'C0B59BHPG81'
+// Workspace-specific base URL — used to build deep links that open in the correct workspace
+// instead of defaulting to whichever workspace the user has active in their Slack app.
+export const SLACK_WORKSPACE_URL = 'https://elevensignal.slack.com'
 // Channel for outbound asset-need alerts — set SLACK_ASSET_NEEDS_CHANNEL_ID in Vercel env vars
 export const ASSET_NEEDS_CHANNEL_ID = process.env.SLACK_ASSET_NEEDS_CHANNEL_ID ?? ''
 
