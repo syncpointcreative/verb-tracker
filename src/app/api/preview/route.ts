@@ -51,6 +51,9 @@ export async function GET(req: NextRequest) {
   const assetId  = searchParams.get('asset_id')
   const file     = searchParams.get('file')
   const metaOnly = searchParams.get('meta') === '1'
+  // ?diag=1 — returns JSON about the upstream fetch (status, headers) without streaming the body.
+  // Useful for debugging when videos won't play: open /api/preview?asset_id=<id>&diag=1 in a new tab.
+  const diagMode = searchParams.get('diag') === '1'
 
   if (!assetId && !file) {
     return NextResponse.json({ error: 'Missing ?asset_id= or ?file=' }, { status: 400 })
@@ -126,27 +129,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'SLACK_BOT_TOKEN not set' }, { status: 500 })
     }
 
-    const slackRes = await fetch(slackUrl, isDriveUrl
-      ? {}
-      : { headers: { Authorization: `Bearer ${token}` } }
-    )
+    // Forward Range header from the browser so video seeking works.
+    // Without this, the browser fetches the whole file before playing.
+    const rangeHeader = req.headers.get('range')
+    const upstreamHeaders: Record<string, string> = {}
+    if (!isDriveUrl) upstreamHeaders['Authorization'] = `Bearer ${token!}`
+    if (rangeHeader)  upstreamHeaders['Range'] = rangeHeader
 
-    if (!slackRes.ok) {
+    const upstreamRes = await fetch(slackUrl, { headers: upstreamHeaders })
+
+    // ?diag=1 — return JSON about the upstream response without streaming the body.
+    // Open /api/preview?asset_id=<id>&diag=1 in a browser tab to debug fetch errors.
+    if (diagMode) {
+      const diagHeaders: Record<string, string> = {}
+      upstreamRes.headers.forEach((v, k) => { diagHeaders[k] = v })
+      return NextResponse.json({
+        status:      upstreamRes.status,
+        ok:          upstreamRes.ok,
+        slackUrl:    slackUrl.substring(0, 100),
+        tokenPrefix: token ? token.substring(0, 12) + '…' : null,
+        headers:     diagHeaders,
+      })
+    }
+
+    if (!upstreamRes.ok) {
+      console.error(`[preview] upstream fetch failed: ${upstreamRes.status} — ${slackUrl.substring(0, 80)}`)
       return NextResponse.json(
-        { error: `${isDriveUrl ? 'Drive' : 'Slack'} fetch failed: ${slackRes.status}` },
+        { error: `${isDriveUrl ? 'Drive' : 'Slack'} fetch failed: ${upstreamRes.status}` },
         { status: 502 }
       )
     }
 
     const headers = new Headers({
-      'Content-Type':        mimeType ?? 'application/octet-stream',
+      'Content-Type':   mimeType ?? upstreamRes.headers.get('content-type') ?? 'application/octet-stream',
       'Content-Disposition': 'inline',
-      'Cache-Control':       'private, max-age=3600',
+      'Cache-Control':  'private, max-age=3600',
+      'Accept-Ranges':  'bytes',   // tells the browser range requests are supported
     })
-    const contentLength = slackRes.headers.get('content-length')
+    const contentLength = upstreamRes.headers.get('content-length')
     if (contentLength) headers.set('Content-Length', contentLength)
+    const contentRange = upstreamRes.headers.get('content-range')
+    if (contentRange)  headers.set('Content-Range', contentRange)
 
-    return new NextResponse(slackRes.body, { status: 200, headers })
+    // Preserve 206 Partial Content so browsers can seek through video
+    return new NextResponse(upstreamRes.body, { status: upstreamRes.status, headers })
   }
 
   // ── Path 2: file_name supplied (legacy) ──────────────────────────────────────
@@ -177,11 +203,14 @@ export async function GET(req: NextRequest) {
 
   if (!token) return NextResponse.json({ error: 'SLACK_BOT_TOKEN not set' }, { status: 500 })
 
-  const slackRes = await fetch(item.url_private_download, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const rangeHeader2 = req.headers.get('range')
+  const legacyFetchHeaders: Record<string, string> = { Authorization: `Bearer ${token}` }
+  if (rangeHeader2) legacyFetchHeaders['Range'] = rangeHeader2
+
+  const slackRes = await fetch(item.url_private_download, { headers: legacyFetchHeaders })
 
   if (!slackRes.ok) {
+    console.error(`[preview/legacy] Slack fetch failed: ${slackRes.status}`)
     return NextResponse.json(
       { error: `Slack fetch failed: ${slackRes.status}` },
       { status: 502 }
@@ -192,9 +221,12 @@ export async function GET(req: NextRequest) {
     'Content-Type':        item.mimetype ?? 'application/octet-stream',
     'Content-Disposition': 'inline',
     'Cache-Control':       'private, max-age=3600',
+    'Accept-Ranges':       'bytes',
   })
   const contentLength = slackRes.headers.get('content-length')
   if (contentLength) headers.set('Content-Length', contentLength)
+  const contentRange = slackRes.headers.get('content-range')
+  if (contentRange)  headers.set('Content-Range', contentRange)
 
-  return new NextResponse(slackRes.body, { status: 200, headers })
+  return new NextResponse(slackRes.body, { status: slackRes.status, headers })
 }
