@@ -89,14 +89,41 @@ export async function findBoardByName(search: string): Promise<MondayBoard | nul
 
 // ── Group helpers ─────────────────────────────────────────────────────────────
 
+const INCOMING_GROUP_NAME = '📥 Incoming'
+
 /**
- * Find the current-month group on a board (e.g. "MAY 2026").
- * Creates the group if it doesn't exist yet.
+ * Find or create the "📥 Incoming" group on a board.
+ *
+ * New assets land here because go-live month isn't known at submission time
+ * (assets are typically created 1-2 months before use). The team drags items
+ * to the appropriate month group when scheduling.
+ */
+export async function findOrCreateIncomingGroup(boardId: string): Promise<string> {
+  const data = await mondayQuery<{ boards: Array<{ groups: Array<{ id: string; title: string }> }> }>(`
+    query($id: [ID!]) {
+      boards(ids: $id) { groups { id title } }
+    }
+  `, { id: [boardId] })
+
+  const existing = data.boards[0]?.groups.find(g => g.title === INCOMING_GROUP_NAME)
+  if (existing) return existing.id
+
+  const created = await mondayQuery<{ create_group: { id: string } }>(`
+    mutation($boardId: ID!, $groupName: String!) {
+      create_group(board_id: $boardId, group_name: $groupName) { id }
+    }
+  `, { boardId, groupName: INCOMING_GROUP_NAME })
+
+  return created.create_group.id
+}
+
+/**
+ * Find the month-named group on a board (e.g. "MAY 2026").
+ * Creates it if it doesn't exist yet. Used for future use when date_live is known.
  */
 export async function findOrCreateMonthGroup(boardId: string): Promise<string> {
   const title = currentMonthGroupTitle()
 
-  // Re-fetch just this board's groups to get the freshest list
   const data = await mondayQuery<{ boards: Array<{ groups: Array<{ id: string; title: string }> }> }>(`
     query($id: [ID!]) {
       boards(ids: $id) { groups { id title } }
@@ -136,10 +163,16 @@ export interface CreateContentItemParams {
   boardId:       string
   groupId:       string
   itemName:      string
-  /** Monday user ID (numeric string) to assign the item to, if known */
+  /** Monday user ID (numeric string) to assign the item to */
   assigneeId?:   string
   /** Column ID of the "people" column on this board */
   peopleColId?:  string
+  /** URL to link (e.g. Slack message URL) */
+  linkUrl?:      string
+  /** Display text for the link */
+  linkText?:     string
+  /** Column ID of the "link" column on this board */
+  linkColId?:    string
 }
 
 export async function createContentItem(params: CreateContentItemParams): Promise<string> {
@@ -148,6 +181,13 @@ export async function createContentItem(params: CreateContentItemParams): Promis
   if (params.assigneeId && params.peopleColId) {
     columnValues[params.peopleColId] = {
       personsAndTeams: [{ id: Number(params.assigneeId), kind: 'person' }],
+    }
+  }
+
+  if (params.linkUrl && params.linkColId) {
+    columnValues[params.linkColId] = {
+      url:  params.linkUrl,
+      text: params.linkText ?? params.linkUrl,
     }
   }
 

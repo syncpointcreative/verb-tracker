@@ -6,41 +6,40 @@
  *
  * What it does:
  *   1. Finds the FlavCity board (by name match)
- *   2. Finds/creates the current-month group ("MAY 2026" etc.)
+ *   2. Finds/creates the "📥 Incoming" group
  *   3. Finds Libby Ragole by name
- *   4. Finds the first "people" column on the board
- *   5. Creates item "Morning Fuel - Seth Baron" assigned to Libby
- *
- * Returns JSON describing every step so you can verify before enabling
- * the integration in the Slack webhook.
+ *   4. Finds the people + link columns on the board
+ *   5. Creates item "Morning Fuel - Seth Baron" assigned to Libby,
+ *      with the Slack message link in the Link column
  */
 
 import { NextResponse } from 'next/server'
 import { parseFilename } from '@/lib/parser'
+import { SLACK_CHANNEL_ID, SLACK_WORKSPACE_URL } from '@/lib/constants'
 import {
   findBoardByName,
-  findOrCreateMonthGroup,
+  findOrCreateIncomingGroup,
   findUserByName,
   createContentItem,
-  currentMonthGroupTitle,
 } from '@/lib/monday'
 
 export const runtime = 'edge'
 
-const TEST_FILENAME = 'FLAV-VL-CON-SB-MorningFuel-052726.m4v'
+const TEST_FILENAME  = 'FLAV-VL-CON-SB-MorningFuel-052726.m4v'
+// Slack timestamp for this message — swap for the real ts if you want a live link
+const TEST_SLACK_TS  = '1748380800.000000'
+
+function buildSlackLink(ts: string): string {
+  return `${SLACK_WORKSPACE_URL}/archives/${SLACK_CHANNEL_ID}/p${ts.replace('.', '')}`
+}
 
 export async function GET() {
   const steps: Record<string, unknown> = {}
 
   try {
-    // 1. Parse the filename
+    // 1. Parse filename
     const parsed = parseFilename(TEST_FILENAME)
-    steps.parsed = {
-      clientName: parsed.clientName,
-      title:      parsed.title,
-      postedBy:   parsed.postedBy,
-      stage:      parsed.stage,
-    }
+    steps.parsed = { clientName: parsed.clientName, title: parsed.title, postedBy: parsed.postedBy, stage: parsed.stage }
 
     if (!parsed.clientName) {
       return NextResponse.json({ ok: false, steps, error: 'Could not parse client from filename' }, { status: 400 })
@@ -55,33 +54,37 @@ export async function GET() {
     // 2. Find the FlavCity board
     const board = await findBoardByName('flav')
     if (!board) {
-      return NextResponse.json({
-        ok:    false,
-        steps,
-        error: 'No board found matching "flav" — check /api/monday-setup to see available boards',
-      }, { status: 404 })
+      return NextResponse.json({ ok: false, steps, error: 'No board matching "flav" — check /api/monday-setup' }, { status: 404 })
     }
     steps.board = { id: board.id, name: board.name }
 
-    // 3. Find or create the current-month group
-    const groupId    = await findOrCreateMonthGroup(board.id)
-    steps.monthGroup = { title: currentMonthGroupTitle(), id: groupId }
+    // 3. Find/create the Incoming group
+    const groupId = await findOrCreateIncomingGroup(board.id)
+    steps.incomingGroup = { id: groupId }
 
     // 4. Find Libby
-    const libby      = await findUserByName('libby')
-    steps.libby      = libby ? { id: libby.id, name: libby.name, email: libby.email } : null
+    const libby   = await findUserByName('libby')
+    steps.libby   = libby ? { id: libby.id, name: libby.name } : null
 
-    // 5. Find the first "people" column on the board
-    const peopleCol  = board.columns.find(c => c.type === 'multiple-person' || c.type === 'people')
-    steps.peopleCol  = peopleCol ?? null
+    // 5. Find people + link columns
+    const peopleCol = board.columns.find(c => c.type === 'multiple-person' || c.type === 'people')
+    const linkCol   = board.columns.find(c => c.type === 'link')
+    steps.columns = { people: peopleCol ?? null, link: linkCol ?? null }
 
-    // 6. Create the item
+    // 6. Build Slack link
+    const slackLink = buildSlackLink(TEST_SLACK_TS)
+    steps.slackLink = slackLink
+
+    // 7. Create the item
     const itemId = await createContentItem({
-      boardId:      board.id,
+      boardId:     board.id,
       groupId,
       itemName,
-      assigneeId:   libby?.id,
-      peopleColId:  peopleCol?.id,
+      assigneeId:  libby?.id,
+      peopleColId: peopleCol?.id,
+      linkUrl:     slackLink,
+      linkText:    'View in Slack',
+      linkColId:   linkCol?.id,
     })
 
     steps.created = { itemId }
