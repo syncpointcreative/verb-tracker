@@ -17,6 +17,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
+// Edge runtime has no response body size limit — critical for streaming large video files.
+// Serverless functions cap at 4.5MB which cuts off any video bigger than that.
+export const runtime = 'edge'
+
 /** Fetch url_private_download + mimetype for a file from a Slack message. */
 async function fetchSlackFileUrl(
   token: string,
