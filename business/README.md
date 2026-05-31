@@ -39,11 +39,11 @@ Layered on top of Phase 1. Same clients, expanded scope, higher retainers.
 
 | Tool | Cost | Purpose |
 |---|---|---|
-| Bland AI (Build plan) | $299/mo | Voice agent platform |
+| Retell AI (pay-as-you-go) | ~$50–$150/mo | Voice agent platform (better latency + inbound than Bland) |
 | Google Workspace | $12/mo | Email for cold outreach |
 | Notion (free) | $0 | Client ops + docs |
 | Instantly.ai or Lemlist | $37–$59/mo | Cold email automation |
 | Cal.com (free) | $0 | Demo booking |
-| **Total** | **~$350–$370/mo** | |
+| **Total** | **~$125–$250/mo** | *(scales with call volume)* |
 
 > Add GoHighLevel ($97/mo) at Month 3 when you hit 5+ clients. It consolidates CRM, reporting, and reputation management in one place and makes Phase 2 (automation agency) much easier.

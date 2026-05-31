@@ -1,10 +1,28 @@
-# Agent Configuration — Syncpoint AI (Bland AI)
+# Agent Configuration — Syncpoint AI (Retell AI)
+
+## Platform Choice: Why Retell AI (Not Bland AI)
+
+Bland AI was the early market leader but has meaningful problems for this use case:
+- **Latency:** 800ms–2 second response time causes callers to talk over the agent, breaking the "sounds natural" pitch
+- **Support:** Multiple reports of week+ response times — unacceptable when a client's agent breaks mid-day
+- **Inbound optimization:** Bland is built for outbound campaigns; dental calls are inbound
+
+**Retell AI** wins on inbound dental calls:
+- ~600ms latency (industry-leading for inbound)
+- Native appointment booking integrations
+- HIPAA-eligible plans
+- Better voice quality
+- Comparable pricing at moderate volume
+
+> **Alternative:** Synthflow AI has the strongest white-label features (custom domain, Stripe rebilling) but the agency plan ($1,400/mo) is only worth it at 8+ clients. Revisit Synthflow at that point.
+
+---
 
 ## Platform Setup (Do Once)
 
-1. Sign up at app.bland.ai → select **Build Plan** ($299/month)
-2. Go to Settings → White Label → Set name to "Syncpoint AI"
-3. Create a test phone number (free with plan) → this is your demo line
+1. Sign up at app.retellai.com → start on the pay-as-you-go plan (~$0.15/min all-in)
+2. Go to Settings → White Label → enable custom branding as "Syncpoint AI"
+3. Create a test phone number (~$2/month) → this is your demo line
 4. Create a "Template" agent called "Dental Practice — Base Template"
    - All new client agents clone from this template
    - Customization per client takes ~90 minutes with this system
