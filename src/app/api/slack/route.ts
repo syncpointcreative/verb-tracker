@@ -155,7 +155,7 @@ async function createMondayItemsForApproval(
   const { data: assets } = await supabase
     .from('assets')
     .select(`
-      id, asset_name, file_name, posted_by, content_type, monday_item_id,
+      id, asset_name, file_name, posted_by, content_type, monday_item_id, drive_url,
       product:products(name),
       client:clients(id, name)
     `)
@@ -164,7 +164,7 @@ async function createMondayItemsForApproval(
 
   if (!assets?.length) return
 
-  // Build Slack message deep-link
+  // Build Slack message deep-link (used as fallback if Drive URL isn't ready yet)
   const slackLink = `${SLACK_WORKSPACE_URL}/archives/${SLACK_CHANNEL_ID}/p${messageTs.replace('.', '')}`
 
   // Look up Libby once — shared assignee across all items
@@ -218,14 +218,19 @@ async function createMondayItemsForApproval(
       const itemName  = creator ? `${title} — ${creator}` : title
 
       try {
+        // If the file is already on Drive (uploaded before Monday item creation),
+        // use the Drive URL directly so the link is correct from the start.
+        const linkUrl  = asset.drive_url ?? slackLink
+        const linkText = asset.drive_url ? 'View in Drive' : 'View in Slack'
+
         const itemId = await createContentItem({
           boardId:     board.id,
           groupId,
           itemName,
           assigneeId:  libby?.id,
           peopleColId: peopleCol?.id,
-          linkUrl:     slackLink,
-          linkText:    'View in Slack',
+          linkUrl,
+          linkText,
           linkColId:   linkCol?.id,
         })
 
