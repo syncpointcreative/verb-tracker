@@ -8,6 +8,12 @@
  *   2. If the asset has a monday_item_id, updates that item's link column
  *      from the Slack URL → the permanent Drive URL
  *
+ * Slack URL expiry handling:
+ *   url_private_download links expire after ~7 days. On a 404 the cron
+ *   automatically tries to get a fresh URL:
+ *     - Real Slack file IDs  → files.info API
+ *     - Backfill entries     → conversations.history via the asset's slack_message_ts
+ *
  * Manual testing:
  *   curl ".../api/cron/drive-sync" -H "Authorization: Bearer <CRON_SECRET>"
  *
@@ -23,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { uploadFile } from '@/lib/storage'
 import { findBoardByName, updateItemLinkColumn } from '@/lib/monday'
+import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
 const BATCH_SIZE = 5 // process up to 5 files per run to stay within timeout
 
@@ -62,12 +69,40 @@ export async function GET(req: NextRequest) {
       .eq('id', item.id)
 
     try {
-      const driveUrl = await uploadFile({
-        slackUrl:   item.url_private_download,
-        fileName:   item.file_name,
-        mimeType:   item.mimetype,
-        clientName: item.client_name,
-      })
+      let slackUrl = item.url_private_download
+
+      // First attempt
+      let driveUrl: string
+      try {
+        driveUrl = await uploadFile({
+          slackUrl,
+          fileName:   item.file_name,
+          mimeType:   item.mimetype,
+          clientName: item.client_name,
+        })
+      } catch (firstErr) {
+        // If Slack returned 404 the stored URL has expired — try to refresh it
+        if (!String(firstErr).includes('404')) throw firstErr
+
+        console.warn(`[drive-sync] 404 on ${item.file_name} — refreshing Slack URL...`)
+        const freshUrl = await getFreshSlackUrl(item.slack_file_id, item.file_name, supabase)
+        if (!freshUrl) throw new Error(`Slack download failed: 404 and could not refresh URL`)
+
+        // Persist the fresh URL so future retries don't need to refresh again
+        slackUrl = freshUrl
+        await supabase
+          .from('drive_queue')
+          .update({ url_private_download: freshUrl })
+          .eq('id', item.id)
+
+        // Retry upload with fresh URL
+        driveUrl = await uploadFile({
+          slackUrl:   freshUrl,
+          fileName:   item.file_name,
+          mimeType:   item.mimetype,
+          clientName: item.client_name,
+        })
+      }
 
       await supabase
         .from('drive_queue')
@@ -94,6 +129,70 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, processed: items.length, succeeded, failed })
+}
+
+// ── Slack URL refresh ─────────────────────────────────────────────────────────
+
+/**
+ * When a stored url_private_download has expired (404), fetch a fresh one.
+ *
+ * Two strategies:
+ *  1. Real Slack file ID  → files.info returns current download URL directly
+ *  2. Backfill entry      → slack_file_id starts with "backfill-", so look up
+ *     the asset's slack_message_ts and call conversations.history to find
+ *     the file by name in the original message
+ */
+async function getFreshSlackUrl(
+  slackFileId: string,
+  fileName:    string,
+  supabase:    ReturnType<typeof createServerClient>,
+): Promise<string | null> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return null
+
+  // Strategy 1: real Slack file ID
+  if (!slackFileId.startsWith('backfill-')) {
+    try {
+      const res  = await fetch(`https://slack.com/api/files.info?file=${slackFileId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json() as { ok: boolean; file?: { url_private_download?: string } }
+      if (json.ok && json.file?.url_private_download) {
+        console.log(`[drive-sync] refreshed URL via files.info for ${fileName}`)
+        return json.file.url_private_download
+      }
+    } catch { /* fall through to strategy 2 */ }
+  }
+
+  // Strategy 2: look up the asset's message TS and re-fetch from conversations.history
+  const { data: asset } = await supabase
+    .from('assets')
+    .select('slack_message_ts, slack_channel_id')
+    .eq('file_name', fileName)
+    .not('slack_message_ts', 'is', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (!asset?.slack_message_ts) return null
+
+  const channelId = asset.slack_channel_id ?? SLACK_CHANNEL_ID
+  try {
+    const res  = await fetch(
+      `https://slack.com/api/conversations.history?channel=${channelId}&latest=${asset.slack_message_ts}&limit=1&inclusive=true`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    const json = await res.json() as {
+      ok: boolean
+      messages?: Array<{ files?: Array<{ name?: string; url_private_download?: string }> }>
+    }
+    const file = json.messages?.[0]?.files?.find(f => f.name === fileName)
+    if (file?.url_private_download) {
+      console.log(`[drive-sync] refreshed URL via conversations.history for ${fileName}`)
+      return file.url_private_download
+    }
+  } catch { /* give up */ }
+
+  return null
 }
 
 // ── Back-link helper ──────────────────────────────────────────────────────────
