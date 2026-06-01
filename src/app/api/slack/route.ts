@@ -155,7 +155,7 @@ async function createMondayItemsForApproval(
   const { data: assets } = await supabase
     .from('assets')
     .select(`
-      id, asset_name, content_type,
+      id, asset_name, file_name, posted_by, content_type, monday_item_id,
       product:products(name),
       client:clients(id, name)
     `)
@@ -174,6 +174,8 @@ async function createMondayItemsForApproval(
   // Group by client to minimise board lookups (one listBoards() call per client)
   const byClientId = new Map<string, typeof assets>()
   for (const asset of assets) {
+    // Skip assets that already have a Monday item — prevents duplicates on double-reaction
+    if (asset.monday_item_id) continue
     const clientId = (asset.client as unknown as { id: string } | null)?.id
     if (!clientId) continue
     if (!byClientId.has(clientId)) byClientId.set(clientId, [])
@@ -208,9 +210,12 @@ async function createMondayItemsForApproval(
     const linkCol   = board.columns.find(c => c.type === 'link')
 
     for (const asset of clientAssets) {
-      const product  = (asset.product as unknown as { name: string } | null)?.name ?? 'Unknown Product'
-      const type     = asset.content_type ?? 'Asset'
-      const itemName = `${product} — ${type}`
+      // Parse a clean title from the filename (e.g. "MorningFuel" → "Morning Fuel")
+      // Fall back to asset_name if parsing yields nothing useful
+      const parsed    = asset.file_name ? parseFilename(asset.file_name) : null
+      const title     = parsed?.title ?? asset.asset_name
+      const creator   = asset.posted_by ?? parsed?.postedBy ?? null
+      const itemName  = creator ? `${title} — ${creator}` : title
 
       try {
         const itemId = await createContentItem({
