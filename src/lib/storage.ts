@@ -109,13 +109,15 @@ async function ensureGoogleSubfolder(token: string, parentId: string, name: stri
   const q = encodeURIComponent(
     `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
   )
-  const listRes  = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  // supportsAllDrives + includeItemsFromAllDrives required for Shared Drive folders
+  const listRes  = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
   const listJson = await listRes.json() as { files?: Array<{ id: string }> }
   if (listJson.files?.length) return listJson.files[0].id
 
-  const createRes  = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const createRes  = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
@@ -141,8 +143,9 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: Uplo
     Buffer.from(`\r\n--${boundary}--`),
   ])
 
+  // supportsAllDrives=true required for Shared Drive uploads
   const res  = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true',
     {
       method: 'POST',
       headers: {
