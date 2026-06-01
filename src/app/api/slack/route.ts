@@ -6,7 +6,8 @@
  * 1. message / file_shared  — ingest new assets from #creative-asset-submissions-only
  * 2. message (subtype: message_deleted) — mark assets as "Removed by Request"
  * 3. reaction_added
- *      ✅ from Libby → queue file for Drive upload
+ *      ✅ from Libby → queue file for Drive upload + create Monday item
+ *      ✔️ from Libby → queue file for Drive upload only (ad_only, no Monday item)
  *      ❌ from Libby → mark asset "Removed by Request" + cancel any pending Drive queue entry
  *
  * Slack setup:
@@ -20,8 +21,16 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { parseFilename, inferStage } from '@/lib/parser'
-import { SLACK_CHANNEL_ID } from '@/lib/constants'
+import { SLACK_CHANNEL_ID, SLACK_WORKSPACE_URL } from '@/lib/constants'
 import { refreshDeliveredCount } from '@/lib/deliveries'
+import {
+  findBoardByName,
+  findOrCreateIncomingGroup,
+  findUserByName,
+  createContentItem,
+  type MondayBoard,
+  type MondayUser,
+} from '@/lib/monday'
 
 // Libby's Slack user ID — only her ✅ reactions trigger Drive upload
 const LIBBY_USER_ID = 'U0B608MGUPJ'
@@ -126,6 +135,108 @@ async function queueApprovedFiles(messageTs: string): Promise<void> {
   }
 }
 
+// ─── Monday.com: create items on ✅ approval ──────────────────────────────────
+
+/**
+ * For each asset tied to this Slack message, create a Monday.com item in the
+ * client's "📥 Incoming Assets" group. Stores the returned item ID on the asset
+ * row so the drive-sync cron can later update the link column with the Drive URL.
+ *
+ * Non-fatal: any Monday failure is logged but does not break the approval flow.
+ * Only called on ✅ (white_check_mark) — not on ✔️ (heavy_check_mark / ad_only).
+ */
+async function createMondayItemsForApproval(
+  messageTs: string,
+  supabase:  ReturnType<typeof createServerClient>,
+): Promise<void> {
+  if (!process.env.MONDAY_API_TOKEN) return // silently skip if not configured
+
+  // Fetch the approved assets with their product + client info
+  const { data: assets } = await supabase
+    .from('assets')
+    .select(`
+      id, asset_name, content_type,
+      product:products(name),
+      client:clients(id, name)
+    `)
+    .eq('slack_message_ts', messageTs)
+    .eq('slack_channel_id', SLACK_CHANNEL_ID)
+
+  if (!assets?.length) return
+
+  // Build Slack message deep-link
+  const slackLink = `${SLACK_WORKSPACE_URL}/archives/${SLACK_CHANNEL_ID}/p${messageTs.replace('.', '')}`
+
+  // Look up Libby once — shared assignee across all items
+  let libby: MondayUser | null = null
+  try { libby = await findUserByName('libby') } catch { /* unassigned is fine */ }
+
+  // Group by client to minimise board lookups (one listBoards() call per client)
+  const byClientId = new Map<string, typeof assets>()
+  for (const asset of assets) {
+    const clientId = (asset.client as unknown as { id: string } | null)?.id
+    if (!clientId) continue
+    if (!byClientId.has(clientId)) byClientId.set(clientId, [])
+    byClientId.get(clientId)!.push(asset)
+  }
+
+  for (const [, clientAssets] of byClientId) {
+    const client = clientAssets[0].client as unknown as { id: string; name: string } | null
+    if (!client) continue
+
+    let board: MondayBoard | null = null
+    try {
+      board = await findBoardByName(client.name)
+    } catch (err) {
+      console.error(`[slack/monday] board lookup failed for ${client.name}:`, err)
+      continue
+    }
+    if (!board) {
+      console.warn(`[slack/monday] no board found for client "${client.name}" — skipping`)
+      continue
+    }
+
+    let groupId: string
+    try {
+      groupId = await findOrCreateIncomingGroup(board.id)
+    } catch (err) {
+      console.error(`[slack/monday] group create failed for board ${board.id}:`, err)
+      continue
+    }
+
+    const peopleCol = board.columns.find(c => c.type === 'multiple-person' || c.type === 'people')
+    const linkCol   = board.columns.find(c => c.type === 'link')
+
+    for (const asset of clientAssets) {
+      const product  = (asset.product as unknown as { name: string } | null)?.name ?? 'Unknown Product'
+      const type     = asset.content_type ?? 'Asset'
+      const itemName = `${product} — ${type}`
+
+      try {
+        const itemId = await createContentItem({
+          boardId:     board.id,
+          groupId,
+          itemName,
+          assigneeId:  libby?.id,
+          peopleColId: peopleCol?.id,
+          linkUrl:     slackLink,
+          linkText:    'View in Slack',
+          linkColId:   linkCol?.id,
+        })
+
+        await supabase
+          .from('assets')
+          .update({ monday_item_id: itemId })
+          .eq('id', asset.id)
+
+        console.log(`[slack/monday] created item ${itemId} for asset ${asset.id} (${itemName})`)
+      } catch (err) {
+        console.error(`[slack/monday] item creation failed for asset ${asset.id}:`, err)
+      }
+    }
+  }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -164,7 +275,7 @@ export async function POST(req: NextRequest) {
 
     if (userId === LIBBY_USER_ID && itemChannel === SLACK_CHANNEL_ID && messageTs) {
       if (reaction === 'white_check_mark') {
-        // ✅ — approve for ads + counts toward monthly asset counter
+        // ✅ — approve for ads + counts toward monthly asset counter + Monday item
         await queueApprovedFiles(messageTs)
 
         const supabase = createServerClient()
@@ -174,6 +285,11 @@ export async function POST(req: NextRequest) {
           .eq('slack_message_ts', messageTs)
           .eq('slack_channel_id', SLACK_CHANNEL_ID)
           .eq('status', 'Pending Review')
+
+        // Create Monday.com items for ✅-approved assets (non-fatal if Monday is down)
+        await createMondayItemsForApproval(messageTs, supabase).catch(err =>
+          console.error('[slack/monday] createMondayItemsForApproval failed:', err)
+        )
 
         // Refresh delivered count (ad_only=false so this asset counts)
         const { data: affected } = await supabase

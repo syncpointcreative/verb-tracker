@@ -41,6 +41,8 @@ export interface Asset {
   ad_only:          boolean         // true = approved for ads but excluded from monthly asset counter (✔️ reaction)
   campaigns:        string[]        // campaign tag names this asset is assigned to
   status_changed_at: string | null
+  drive_url:        string | null   // Google Drive webViewLink — set after ✅ approval + cron upload
+  monday_item_id:   string | null   // Monday.com item ID — set on ✅ approval (not ✔️)
   performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
   created_at: string
   updated_at: string

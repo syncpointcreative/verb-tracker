@@ -89,10 +89,10 @@ export async function findBoardByName(search: string): Promise<MondayBoard | nul
 
 // ── Group helpers ─────────────────────────────────────────────────────────────
 
-const INCOMING_GROUP_NAME = '📥 Incoming'
+const INCOMING_GROUP_NAME = '📥 Incoming Assets'
 
 /**
- * Find or create the "📥 Incoming" group on a board.
+ * Find or create the "📥 Incoming Assets" group on a board.
  *
  * New assets land here because go-live month isn't known at submission time
  * (assets are typically created 1-2 months before use). The team drags items
@@ -208,4 +208,31 @@ export async function createContentItem(params: CreateContentItemParams): Promis
   })
 
   return data.create_item.id
+}
+
+// ── Item updates ──────────────────────────────────────────────────────────────
+
+/**
+ * Update the link column on an existing Monday item.
+ * Called after the Drive upload cron finishes so the Monday item's link
+ * switches from the Slack message URL to the permanent Google Drive URL.
+ */
+export async function updateItemLinkColumn(
+  boardId:  string,
+  itemId:   string,
+  colId:    string,
+  url:      string,
+  text:     string,
+): Promise<void> {
+  const cv = JSON.stringify({ [colId]: { url, text } })
+
+  await mondayQuery<{ change_multiple_column_values: { id: string } }>(`
+    mutation($boardId: ID!, $itemId: ID!, $cv: JSON!) {
+      change_multiple_column_values(
+        board_id:      $boardId
+        item_id:       $itemId
+        column_values: $cv
+      ) { id }
+    }
+  `, { boardId, itemId, cv })
 }
