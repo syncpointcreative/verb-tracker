@@ -11,6 +11,7 @@ export interface Client {
   drive_url: string | null
   billing_day: number  // day-of-month the billing period starts; default 1
   tracks_deliveries: boolean  // false = hide the monthly delivery counter (e.g. non-social clients)
+  default_quota: number  // monthly deliverable quota for periods without an explicit row; default 30
 }
 
 export interface Product {

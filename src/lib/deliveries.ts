@@ -91,10 +91,13 @@ export async function refreshDeliveredCount(
     // Skip clients whose delivery counter is turned off (e.g. non-social clients).
     const { data: client } = await supabase
       .from('clients')
-      .select('tracks_deliveries')
+      .select('tracks_deliveries, default_quota')
       .eq('id', clientId)
       .maybeSingle()
     if (client && client.tracks_deliveries === false) return
+
+    // Per-client monthly quota for periods that don't have an explicit row yet.
+    const clientQuota = client?.default_quota ?? DEFAULT_QUOTA
 
     const now   = new Date()
     const curYM = getCurrentPeriodYM(billingDay, now)
@@ -158,7 +161,7 @@ export async function refreshDeliveredCount(
       // Don't create empty future rows once there's nothing left to show.
       if (isFuture && carry === 0 && produced === 0 && !row) break
 
-      const quota     = row?.quota ?? DEFAULT_QUOTA
+      const quota     = row?.quota ?? clientQuota
       const raw       = produced + carry
       const delivered = Math.min(raw, quota)
       carry           = Math.max(0, raw - quota)
