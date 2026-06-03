@@ -310,8 +310,8 @@ export default async function DashboardPage() {
                 )}
               </div>
 
-              {/* Delivery progress */}
-              {currentDelivery && (
+              {/* Delivery progress (hidden for clients we don't track social deliveries for) */}
+              {client.tracks_deliveries !== false && currentDelivery && (
                 <div className={`px-4 pt-3 pb-2.5 border-b border-stone-100 ${isMaxed ? 'bg-emerald-50/50' : ''}`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.08em]">

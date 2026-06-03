@@ -88,6 +88,14 @@ export async function refreshDeliveredCount(
   billingDay = 1
 ) {
   try {
+    // Skip clients whose delivery counter is turned off (e.g. non-social clients).
+    const { data: client } = await supabase
+      .from('clients')
+      .select('tracks_deliveries')
+      .eq('id', clientId)
+      .maybeSingle()
+    if (client && client.tracks_deliveries === false) return
+
     const now   = new Date()
     const curYM = getCurrentPeriodYM(billingDay, now)
 
