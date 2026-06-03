@@ -155,6 +155,15 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'CCSD', name: 'Chili Crunch Sushi Dip' },
     ],
   },
+  {
+    client: 'Joolies', code: 'JOO',
+    products: [
+      { code: 'DSBR',  name: 'Date Sours Blue Raspberry' },
+      { code: 'DSPCH', name: 'Date Sours Peachy' },
+      { code: 'DSWM',  name: 'Date Sours Watermelon' },
+      { code: 'DSCHC', name: 'Date Sours Cherry Cola' },
+    ],
+  },
 ]
 
 const TYPE_CODES = [
