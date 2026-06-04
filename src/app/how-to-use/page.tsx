@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useState, type ReactNode } from 'react'
 
 const FUNNEL_STAGES = [
   {
@@ -158,6 +161,7 @@ const PRODUCT_CODES_BY_CLIENT: {
   {
     client: 'Joolies', code: 'JOO',
     products: [
+      { code: 'ADF',   name: 'All Date Flavors' },
       { code: 'DSBR',  name: 'Date Sours Blue Raspberry' },
       { code: 'DSPCH', name: 'Date Sours Peachy' },
       { code: 'DSWM',  name: 'Date Sours Watermelon' },
@@ -166,6 +170,8 @@ const PRODUCT_CODES_BY_CLIENT: {
   },
 ]
 
+// Legacy content-type codes — retained for filename back-compat only.
+// Intentionally NOT rendered on this page (newer naming uses the funnel stage instead).
 const TYPE_CODES = [
   { code: 'UGC',   name: 'User-Generated Content' },
   { code: 'BLS',   name: 'Brand / Lifestyle' },
@@ -178,6 +184,7 @@ const TYPE_CODES = [
   { code: 'MG',    name: 'Motion Graphics' },
   { code: 'AFF',   name: 'Affiliate Video' },
 ]
+void TYPE_CODES // kept for reference; not shown on the page
 
 const CREATOR_CODES = [
   { code: 'DB', name: 'David Butler' },
@@ -195,6 +202,27 @@ const CREATOR_CODES = [
   { code: 'LS', name: 'Liz Snyder' },
   { code: 'MD', name: 'Mike Dobson' },
 ]
+
+// Collapsible card — header is a clickable button; body shows only when expanded. Default collapsed.
+function Collapsible({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden self-start">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full bg-gray-900 text-white px-4 py-2.5 flex items-center justify-between gap-2 hover:bg-gray-800 transition-colors text-left"
+      >
+        <span className="font-semibold flex items-center gap-2">
+          <span className={`inline-block text-[10px] text-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+          {title}
+        </span>
+        {badge && <code className="text-xs text-gray-400 font-normal">{badge}</code>}
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  )
+}
 
 export default function HowToUsePage() {
   return (
@@ -216,16 +244,15 @@ export default function HowToUsePage() {
         <p className="text-xs text-gray-400">Title should be a short descriptive slug with no spaces — use camel case or underscores (e.g. <code className="bg-gray-100 px-1">SummerHook</code>, <code className="bg-gray-100 px-1">BBQ_Snack</code>)</p>
       </section>
 
-      {/* Product Code Key */}
+      {/* Product Code Key — collapsible per client */}
       <section className="mb-10">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Product Code Key — by Client</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Product Code Key — by Client</h2>
+          <span className="text-xs text-gray-400">Click a client to view its codes</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
           {PRODUCT_CODES_BY_CLIENT.map(({ client, code, products }) => (
-            <div key={client} className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-900 text-white px-4 py-2.5 flex items-center justify-between">
-                <span className="font-semibold">{client}</span>
-                <code className="text-xs text-gray-400">{code}</code>
-              </div>
+            <Collapsible key={client} title={client} badge={code}>
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-gray-100">
                   {products.map(p => (
@@ -236,32 +263,19 @@ export default function HowToUsePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Collapsible>
           ))}
         </div>
       </section>
 
-      {/* Content Type + Creator + Funnel Stage Codes */}
+      {/* Creator + Funnel Stage Codes — collapsible */}
       <section className="mb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold flex items-center justify-between">
-                <span>Content Type Codes</span>
-                <span className="text-xs text-gray-400 font-normal">legacy reference</span>
-              </div>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-gray-100">
-                {TYPE_CODES.map(t => (
-                  <tr key={t.code} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">{t.code}</td>
-                    <td className="px-4 py-2 text-gray-700">{t.name}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold">Creator Codes</div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Naming Codes</h2>
+          <span className="text-xs text-gray-400">Click to expand</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+          <Collapsible title="Creator Codes" badge={`${CREATOR_CODES.length} creators`}>
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
                 {CREATOR_CODES.map(c => (
@@ -272,32 +286,31 @@ export default function HowToUsePage() {
                 ))}
               </tbody>
             </table>
-          </div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden md:col-span-2">
-            <div className="bg-gray-900 text-white px-4 py-2.5 font-semibold">Funnel Stage Codes</div>
+          </Collapsible>
+          <Collapsible title="Funnel Stage Codes" badge="AWA · CON · CVR">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
                 <tr className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">AWA</td>
                   <td className="px-4 py-2 text-gray-700 font-medium">Awareness</td>
-                  <td className="px-4 py-2 text-gray-500">Stop the scroll. Hook-driven, brand intro, scroll-stopping content.</td>
+                  <td className="px-4 py-2 text-gray-500">Stop the scroll. Hook-driven, brand intro.</td>
                 </tr>
                 <tr className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">CON</td>
                   <td className="px-4 py-2 text-gray-700 font-medium">Consideration</td>
-                  <td className="px-4 py-2 text-gray-500">Educate and build desire. Demo, tutorial, testimonial, before/after.</td>
+                  <td className="px-4 py-2 text-gray-500">Educate and build desire. Demo, tutorial, testimonial.</td>
                 </tr>
                 <tr className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">CVR</td>
                   <td className="px-4 py-2 text-gray-700 font-medium">Conversion</td>
-                  <td className="px-4 py-2 text-gray-500">Drive the click. Promo, offer-led, affiliate, urgency-driven.</td>
+                  <td className="px-4 py-2 text-gray-500">Drive the click. Promo, offer-led, affiliate.</td>
                 </tr>
               </tbody>
             </table>
             <div className="bg-gray-50 border-t border-gray-200 px-4 py-2.5 text-xs text-gray-400">
               Target split: 50% Awareness · 30% Consideration · 20% Conversion
             </div>
-          </div>
+          </Collapsible>
         </div>
       </section>
 

@@ -86,6 +86,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
   VL: 'Vanilla Latte Protein',
   // Joolies — Date Sours flavors
+  ADF: 'All Date Flavors',
   DSBR: 'Date Sours Blue Raspberry', DSPCH: 'Date Sours Peachy',
   DSWM: 'Date Sours Watermelon',     DSCHC: 'Date Sours Cherry Cola',
 }
