@@ -242,6 +242,77 @@ const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: stri
   { status: 'Expired',                 label: 'Expired',       bg: 'bg-stone-100',   text: 'text-stone-500',  dot: 'bg-stone-400',   activeBg: 'bg-stone-200'   },
 ]
 
+// ─── Pull (rate performance) modal ────────────────────────────────────────────
+
+type Performance = 'High Performer' | 'Average Performer' | 'Poor Performer'
+
+const PERF_OPTIONS: { value: Performance; emoji: string; label: string }[] = [
+  { value: 'High Performer',    emoji: '🔥', label: 'Strong' },
+  { value: 'Average Performer', emoji: '👍', label: 'OK' },
+  { value: 'Poor Performer',    emoji: '❌', label: 'Poor' },
+]
+
+function PullModal({ asset, onConfirm, onCancel }: {
+  asset: Asset
+  onConfirm: (performance: Performance | null, notes: string) => void
+  onCancel: () => void
+}) {
+  const [performance, setPerformance] = useState<Performance | null>(null)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleConfirm() {
+    setSaving(true)
+    await onConfirm(performance, notes)
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+          <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Pull asset</p>
+          <p className="font-serif text-white text-base leading-snug line-clamp-2">{asset.asset_name}</p>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest mb-2">Performance</p>
+          <div className="flex gap-2 mb-4">
+            {PERF_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setPerformance(performance === opt.value ? null : opt.value)}
+                className={`flex-1 text-xs py-2.5 rounded-xl border transition-all font-medium ${
+                  performance === opt.value
+                    ? 'bg-[#2B3428] text-white border-[#2B3428] shadow-sm'
+                    : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700 bg-white'
+                }`}
+              >
+                <div className="text-base mb-0.5">{opt.emoji}</div>
+                <div>{opt.label}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest mb-2">Notes <span className="normal-case font-normal text-stone-300">(optional)</span></p>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Why was it pulled? Any observations..."
+            className="w-full text-xs border border-stone-200 rounded-xl px-3 py-2.5 mb-4 resize-none h-16 focus:outline-none focus:border-stone-400 placeholder:text-stone-300"
+          />
+          <div className="flex gap-2">
+            <button onClick={onCancel} className="flex-1 text-xs py-2.5 rounded-xl border border-stone-200 text-stone-500 hover:border-stone-300 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleConfirm} disabled={saving} className="flex-1 text-xs py-2.5 rounded-xl bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50">
+              {saving ? 'Pulling…' : 'Confirm Pull'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -256,6 +327,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
   const [saving, setSaving]           = useState(false)
   const [savedMsg, setSavedMsg]       = useState(false)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
+  const [pullTarget, setPullTarget]     = useState<Asset | null>(null)
 
   const [searchQuery,          setSearchQuery]          = useState('')
   const [selectedProductId,    setSelectedProductId]    = useState<string>('')
@@ -353,6 +425,11 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
 
   const handleStatusChange = async (assetId: string, newStatus: AssetStatus) => {
     const asset = localAssets.find(a => a.id === assetId)
+    // Pulling opens the rating dialog instead of changing status directly (matches the Board).
+    if (newStatus === 'Pulled') {
+      if (asset) setPullTarget(asset)
+      return
+    }
     const body: Record<string, string> = { status: newStatus }
     const today = new Date().toISOString().split('T')[0]
 
@@ -382,6 +459,32 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
         a.id === assetId ? { ...updated, product: a.product, client: a.client } : a
       ))
       notifyParent?.(assetId, newStatus, updated)
+    }
+  }
+
+  // ── Confirm a pull with performance rating + notes ───────────────────────────
+  const confirmPull = async (performance: Performance | null, notes: string) => {
+    if (!pullTarget) return
+    const id = pullTarget.id
+    const body: Record<string, unknown> = { status: 'Pulled' }
+    if (performance) body.performance = performance
+    if (notes)       body.notes = notes
+
+    setLocalAssets(prev => prev.map(a =>
+      a.id === id ? { ...a, status: 'Pulled', performance: performance ?? a.performance, notes: notes || a.notes } : a
+    ))
+    setPullTarget(null)
+
+    const res = await fetch(`/api/assets?id=${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setLocalAssets(prev => prev.map(a =>
+        a.id === id ? { ...updated, product: a.product, client: a.client } : a
+      ))
+      notifyParent?.(id, 'Pulled', updated)
     }
   }
 
@@ -497,6 +600,14 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
         <AssetPreviewModal
           asset={previewAsset}
           onClose={() => setPreviewAsset(null)}
+        />
+      )}
+
+      {pullTarget && (
+        <PullModal
+          asset={pullTarget}
+          onConfirm={confirmPull}
+          onCancel={() => setPullTarget(null)}
         />
       )}
 
