@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
+import { daysLive } from '@/lib/freshness'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
@@ -22,7 +23,7 @@ function getFreshness(asset: Asset): { days: number } | 'not-live' | 'paused' | 
   if (['Pulled', 'Removed by Request', 'Pending Review'].includes(asset.status)) return null
   if (asset.status === 'Paused') return 'paused'
   if (!asset.date_live) return 'not-live'
-  const days = Math.floor((Date.now() - new Date(asset.date_live + 'T12:00:00').getTime()) / 86_400_000)
+  const days = daysLive(asset.date_live)
   return { days }
 }
 
@@ -229,9 +230,7 @@ function FreshnessResetDialog({
 }) {
   const [saving, setSaving] = useState(false)
 
-  const daysOld = Math.floor(
-    (Date.now() - new Date(existingDateLive + 'T12:00:00').getTime()) / 86_400_000
-  )
+  const daysOld = daysLive(existingDateLive)
 
   async function handle(action: () => void) {
     setSaving(true)

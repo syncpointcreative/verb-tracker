@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
+import { daysLive, tierForDays } from '@/lib/freshness'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
@@ -18,6 +19,16 @@ interface PendingChange {
 
 // Statuses shown in the main stage tables (active assets)
 const ACTIVE_STATUSES: AssetStatus[] = ['Ready to Upload', 'Live / Running', 'Paused', 'Needs Refresh / Missing', 'Expired']
+
+// Pseudo-status for the Stale quick-filter (Stale is a freshness tier, not a status)
+const STALE_FILTER = '__stale__'
+
+/** A live asset whose freshness tier is "Stale" (22–30 days live). */
+function isStaleRow(a: Asset): boolean {
+  if (!a.date_live) return false
+  if (['Pending Review', 'Pulled', 'Removed by Request', 'Paused'].includes(a.status)) return false
+  return tierForDays(daysLive(a.date_live)) === 'stale'
+}
 
 // Valid next-state transitions per current status
 const STATUS_TRANSITIONS: Partial<Record<AssetStatus, AssetStatus[]>> = {
@@ -94,7 +105,7 @@ function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status:
   if (status === 'Ready to Upload' || !dateLive) {
     return <span className="text-stone-300 text-xs">Not live</span>
   }
-  const days = Math.floor((Date.now() - new Date(dateLive + 'T12:00:00').getTime()) / 86_400_000)
+  const days = daysLive(dateLive)
   const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[FRESHNESS.length - 1]
   const pct  = Math.min(100, Math.round((days / 30) * 100))
   return (
@@ -273,12 +284,15 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
     return counts
   }, [localAssets])
 
+  const staleCount = useMemo(() => localAssets.filter(isStaleRow).length, [localAssets])
+
   const filteredAssets = useMemo(() => {
     let result = localAssets
     if (searchQuery)         result = result.filter(a => a.asset_name.toLowerCase().includes(searchQuery.toLowerCase()))
     if (selectedProductId)   result = result.filter(a => a.product_id === selectedProductId)
     if (selectedCreator)     result = result.filter(a => a.posted_by === selectedCreator)
-    if (selectedStatus)      result = result.filter(a => a.status === selectedStatus)
+    if (selectedStatus === STALE_FILTER) result = result.filter(isStaleRow)
+    else if (selectedStatus) result = result.filter(a => a.status === selectedStatus)
     if (selectedContentType) result = result.filter(a => a.content_type === selectedContentType)
     return [...result].sort((a, b) => {
       const da = a.date_added ?? ''; const db = b.date_added ?? ''
@@ -507,6 +521,19 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
             </button>
           )
         })}
+        {staleCount > 0 && (
+          <button
+            onClick={() => setSelectedStatus(selectedStatus === STALE_FILTER ? '' : STALE_FILTER)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+              selectedStatus === STALE_FILTER
+                ? 'bg-red-200 text-red-700 border-current ring-2 ring-offset-1 ring-current'
+                : 'bg-red-100 text-red-700 border-transparent hover:opacity-90'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            {staleCount} Stale
+          </button>
+        )}
         {selectedStatus && (
           <button onClick={() => setSelectedStatus('')} className="text-xs text-stone-400 hover:text-stone-600 px-1 transition-colors">
             ✕ clear

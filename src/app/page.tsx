@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
+import { daysLive, tierForDays } from '@/lib/freshness'
 import type { Client, Asset } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,18 +45,15 @@ const FRESHNESS_TIERS = [
   { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-stone-400',   text: 'text-stone-500'   },
 ] as const
 
-function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts {
+function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts | null {
   const status = asset.status ?? ''
   if (status === 'Ready to Upload') return 'fresh'
   if (status === 'Expired') return 'expired'
-  const dateStr = asset.date_live ?? asset.date_added
-  if (!dateStr) return 'expired'
-  const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
-  if (days <= 7)  return 'fresh'
-  if (days <= 14) return 'monitor'
-  if (days <= 21) return 'refreshSoon'
-  if (days <= 30) return 'stale'
-  return 'expired'
+  // Freshness aging only applies to assets that have actually gone live. Never
+  // age a not-live asset by its content date (date_added) — the board and table
+  // show those as "Not live", so the dashboard must not flag them stale/expired.
+  if (!asset.date_live) return null
+  return tierForDays(daysLive(asset.date_live))
 }
 
 // ─── Billing period helpers ───────────────────────────────────────────────────
@@ -144,8 +142,10 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       if (asset.status === 'Needs Refresh / Missing') needsRefresh++
       if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
       const tier = getFreshnessTier(asset)
-      freshness[tier]++
-      if (tier === 'stale' || tier === 'expired') staleCount++
+      if (tier) {
+        freshness[tier]++
+        if (tier === 'stale' || tier === 'expired') staleCount++
+      }
       if (asset.content_type) contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
     }
 
