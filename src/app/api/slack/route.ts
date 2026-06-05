@@ -425,15 +425,16 @@ export async function POST(req: NextRequest) {
   )
 
   let added = 0
+  const unparseable: string[] = []
 
   for (const slackFile of slackFiles) {
     const { name: fileName, url: slackFileUrl, mimetype: slackMimetype } = slackFile
 
     const parsed = parseFilename(fileName)
-    if (!parsed.clientName) continue // can't assign without a client
+    if (!parsed.clientName) { unparseable.push(fileName); continue } // no client code → flag, don't drop silently
 
     const clientId = clientByName.get(parsed.clientName)
-    if (!clientId) continue
+    if (!clientId) { unparseable.push(fileName); continue }
 
     // Find best-matching product, or skip if none
     let productId: string | undefined
@@ -490,5 +491,24 @@ export async function POST(req: NextRequest) {
     notes: `Webhook ingest — ${slackFiles.map(f => f.name).join(', ')}`,
   })
 
-  return NextResponse.json({ ok: true, added })
+  // Surface files we couldn't route (filename missing a known client code) so they
+  // don't vanish silently — post a heads-up back into the submission channel.
+  if (unparseable.length > 0) {
+    const token = process.env.SLACK_BOT_TOKEN
+    if (token) {
+      const text =
+        `:warning: *Couldn't add ${unparseable.length} file(s) to the tracker* — the filename doesn't start with a known client code, so it wasn't assigned to a client.\n` +
+        unparseable.map(n => `• \`${n}\``).join('\n') +
+        `\nPlease rename to *CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE* (e.g. \`JOO-ADF-AWA-MP-CandyAisle-060426.mp4\`) and re-post.`
+      try {
+        await fetch('https://slack.com/api/chat.postMessage', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel: SLACK_CHANNEL_ID, text }),
+        })
+      } catch { /* alert is best-effort */ }
+    }
+  }
+
+  return NextResponse.json({ ok: true, added, flagged: unparseable.length })
 }

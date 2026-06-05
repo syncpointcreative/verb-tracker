@@ -39,7 +39,11 @@ export function parseFilename(filename: string): ParsedFilename {
   const clientName  = CLIENT_CODES[parts[0]] ?? null
   const productName = PRODUCT_CODES[parts[1]] ?? null
 
-  if (clientName && productName) {
+  // As long as the CLIENT code (parts[0]) is recognized, parse normally — even if
+  // the PRODUCT code isn't yet known. This keeps a file on the correct client when
+  // a new product code (e.g. a new flavor) hasn't been added yet; the unknown
+  // product resolves to the client's fallback product downstream.
+  if (clientName) {
     // ── Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE ─────────
     // Detected when parts[2] is a STAGE code (AWA/CON/CVR)
     const stageAtPos2 = STAGE_CODES[parts[2]] as Stage | undefined
@@ -76,10 +80,12 @@ export function parseFilename(filename: string): ParsedFilename {
     return { clientName, productName, contentType, stage: null, postedBy, title: null, dateAdded, hasCaption, confidence: 'high' }
   }
 
-  // Fallback: try to find a client code anywhere in the filename
+  // Fallback (parts[0] wasn't a known client code). Match a whole hyphen-delimited
+  // part exactly — never a substring — so a title like "AnotherFlavor" can't be
+  // mistaken for the "FLAV" client code and misrouted.
   let fallbackClient: string | null = null
-  for (const [code, name] of Object.entries(CLIENT_CODES)) {
-    if (base.includes(code)) { fallbackClient = name; break }
+  for (const part of parts) {
+    if (CLIENT_CODES[part]) { fallbackClient = CLIENT_CODES[part]; break }
   }
 
   return {
