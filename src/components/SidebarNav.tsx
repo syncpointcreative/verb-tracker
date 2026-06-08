@@ -31,21 +31,18 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
   const linkCls = (active: boolean) =>
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 ${
       active
-        ? 'bg-white/10 text-[#F5F1EB]'
-        : 'text-[#A8A09A] hover:text-[#F5F1EB] hover:bg-white/5'
+        ? 'bg-white/10 text-[#f0d7c0]'
+        : 'text-[#A8A09A] hover:text-[#f0d7c0] hover:bg-white/5'
     }`
 
   return (
-    <div className="w-56 bg-[#2B3428] flex flex-col h-screen sticky top-0 overflow-y-auto">
+    <div className="w-56 bg-[#3b2b52] flex flex-col h-screen sticky top-0 overflow-y-auto">
 
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10 flex-shrink-0">
-        <Link
-          href="/"
-          style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" }}
-          className="text-[#F5F1EB] text-xs tracking-[0.18em] font-semibold uppercase"
-        >
-          ELEVEN SIGNAL
+      <div className="px-4 py-4 border-b border-white/10 flex-shrink-0">
+        <Link href="/" className="block bg-[#f0d7c0] rounded-lg px-3 py-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/Eleven_Signal_FinalLOGO.png" alt="Eleven Signal" className="w-full h-auto" />
         </Link>
       </div>
 
@@ -63,7 +60,7 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
 
       {/* Client list */}
       <div className="px-3 py-4 flex-1 overflow-y-auto">
-        <p className="text-[10px] tracking-[0.18em] text-[#C4A263] uppercase font-medium px-3 mb-3">
+        <p className="text-[10px] tracking-[0.18em] text-[#d4865e] uppercase font-medium px-3 mb-3">
           Clients
         </p>
         {clients.map(client => {
@@ -85,7 +82,7 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
           href="https://drive.google.com/drive/folders/1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm?usp=sharing"
           target="_blank"
           rel="noreferrer"
-          className="text-xs text-[#C4A263] hover:text-[#D4B373] tracking-[0.12em] uppercase flex items-center gap-1.5 transition-colors"
+          className="text-xs text-[#d4865e] hover:text-[#e0a07d] tracking-[0.12em] uppercase flex items-center gap-1.5 transition-colors"
         >
           Drive
           <svg className="w-3 h-3 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -87,7 +87,7 @@ function PullModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+        <div className="bg-[#3b2b52] rounded-t-2xl px-5 py-4">
           <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Pull asset</p>
           <p className="font-serif text-white text-base leading-snug line-clamp-2">{asset.asset_name}</p>
         </div>
@@ -102,7 +102,7 @@ function PullModal({
                 onClick={() => setPerformance(performance === opt.value ? null : opt.value)}
                 className={`flex-1 text-xs py-2.5 rounded-xl border transition-all font-medium ${
                   performance === opt.value
-                    ? 'bg-[#2B3428] text-white border-[#2B3428] shadow-sm'
+                    ? 'bg-[#3b2b52] text-white border-[#3b2b52] shadow-sm'
                     : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700 bg-white'
                 }`}
               >
@@ -132,7 +132,7 @@ function PullModal({
             <button
               onClick={handleConfirm}
               disabled={saving}
-              className="flex-1 text-xs py-2.5 rounded-xl bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50"
+              className="flex-1 text-xs py-2.5 rounded-xl bg-[#3b2b52] text-white hover:bg-[#4c3a6b] transition-colors disabled:opacity-50"
             >
               {saving ? 'Pulling…' : 'Confirm Pull'}
             </button>
@@ -169,7 +169,7 @@ function ApprovalModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+        <div className="bg-[#3b2b52] rounded-t-2xl px-5 py-4">
           <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Approve asset</p>
           <p className="font-serif text-white text-base leading-snug line-clamp-2">{asset.asset_name}</p>
         </div>
@@ -184,7 +184,7 @@ function ApprovalModal({
             <button
               onClick={() => choose(false)}
               disabled={saving}
-              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#2B3428] bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50"
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#3b2b52] bg-[#3b2b52] text-white hover:bg-[#4c3a6b] transition-colors disabled:opacity-50"
             >
               <div className="font-medium text-sm mb-0.5">✅ Ads + Counter</div>
               <div className="text-[11px] text-white/60">Approved for ads and counts toward the monthly total</div>
@@ -242,7 +242,7 @@ function FreshnessResetDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onCancel}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+        <div className="bg-[#3b2b52] rounded-t-2xl px-5 py-4">
           <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Restore asset</p>
           <p className="font-serif text-white text-base leading-snug line-clamp-2">{assetName}</p>
         </div>
@@ -259,7 +259,7 @@ function FreshnessResetDialog({
             <button
               onClick={() => handle(onReset)}
               disabled={saving}
-              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#2B3428] bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50"
+              className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-[#3b2b52] bg-[#3b2b52] text-white hover:bg-[#4c3a6b] transition-colors disabled:opacity-50"
             >
               <div className="font-medium text-sm mb-0.5">🔄 Reset Freshness</div>
               <div className="text-[11px] text-white/60">Start the freshness clock from today</div>
@@ -456,7 +456,7 @@ function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApproval
   const assignedCampaigns = asset.campaigns ?? []
 
   return (
-    <div className="bg-[#F5F1EB] border border-stone-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-stone-300 transition-all group">
+    <div className="bg-[#f0d7c0] border border-stone-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-stone-300 transition-all group">
 
       {/* Row 1: Status + Freshness */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -491,7 +491,7 @@ function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApproval
       {/* Row 2: Asset name */}
       <button
         onClick={() => onPreview(asset)}
-        className="text-left font-serif text-base font-light text-[#2B3428] leading-snug mb-1.5 hover:text-[#C4A263] transition-colors w-full group/name"
+        className="text-left font-serif text-base font-light text-[#3b2b52] leading-snug mb-1.5 hover:text-[#d4865e] transition-colors w-full group/name"
         title="Click to preview"
       >
         {asset.asset_name || '—'}
@@ -526,7 +526,7 @@ function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApproval
       <div className="flex items-end justify-between gap-2">
         <div className="min-w-0">
           {product && (
-            <p className="text-[11px] text-[#C4A263] tracking-wide truncate mb-1">{product.name}</p>
+            <p className="text-[11px] text-[#d4865e] tracking-wide truncate mb-1">{product.name}</p>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {asset.content_type && (
@@ -588,7 +588,7 @@ function KanbanColumn({
 
   return (
     <div className="flex flex-col min-w-0">
-      <div className="bg-[#2B3428] rounded-xl px-4 py-3 mb-3 flex-shrink-0">
+      <div className="bg-[#3b2b52] rounded-xl px-4 py-3 mb-3 flex-shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <div className={`w-6 h-px ${col.rule}`} />
           <span className={`text-[10px] tracking-[0.2em] uppercase font-semibold ${col.accent}`}>
@@ -660,7 +660,7 @@ function FilterBar({
         onClick={() => onFilter(null)}
         className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors ${
           activeFilter === null
-            ? 'bg-[#2B3428] text-[#F5F1EB] border-[#2B3428]'
+            ? 'bg-[#3b2b52] text-[#f0d7c0] border-[#3b2b52]'
             : 'text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700 bg-white'
         }`}
       >
@@ -948,7 +948,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     <div>
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#2B3428] text-white text-xs px-4 py-2.5 rounded-full shadow-lg pointer-events-none animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#3b2b52] text-white text-xs px-4 py-2.5 rounded-full shadow-lg pointer-events-none animate-fade-in">
           {toast}
         </div>
       )}
@@ -1055,7 +1055,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
                 onClick={() => setMobileStage(stage)}
                 className={`flex-1 py-2.5 text-[11px] font-medium tracking-wide transition-colors ${
                   isActive
-                    ? 'bg-[#2B3428] text-[#F5F1EB]'
+                    ? 'bg-[#3b2b52] text-[#f0d7c0]'
                     : 'bg-white text-stone-500 hover:bg-stone-50'
                 }`}
               >

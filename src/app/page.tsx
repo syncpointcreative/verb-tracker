@@ -160,8 +160,8 @@ export const revalidate = 0
 function SectionOpener({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-px bg-[#C4A263]" />
-      <span className="text-xs tracking-[0.18em] text-[#C4A263] uppercase font-medium">{label}</span>
+      <div className="w-8 h-px bg-[#d4865e]" />
+      <span className="text-xs tracking-[0.18em] text-[#d4865e] uppercase font-medium">{label}</span>
     </div>
   )
 }
@@ -183,7 +183,7 @@ function ActionGroup({
           <div className={`w-6 h-px ${color.dot}`} />
           <span className="text-[10px] tracking-[0.16em] text-[#A8A09A] uppercase font-medium">{label}</span>
         </div>
-        <span className="text-xs font-semibold text-[#F5F1EB]">{total}</span>
+        <span className="text-xs font-semibold text-[#f0d7c0]">{total}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {items.map(({ client, count, statusParam }) => (
@@ -227,13 +227,13 @@ export default async function DashboardPage() {
 
       {/* ── Page header ── */}
       <div className="mb-7">
-        <p className="text-xs tracking-[0.18em] text-[#C4A263] uppercase font-medium mb-1">{today}</p>
-        <h1 className="font-serif text-4xl font-light text-[#2B3428] tracking-wide">Today&apos;s Work</h1>
+        <p className="text-xs tracking-[0.18em] text-[#d4865e] uppercase font-medium mb-1">{today}</p>
+        <h1 className="font-serif text-4xl font-light text-[#3b2b52] tracking-wide">Today&apos;s Work</h1>
       </div>
 
       {/* ── Today's Work command center ── */}
       {hasWork ? (
-        <div className="mb-8 bg-[#2B3428] rounded-xl overflow-hidden">
+        <div className="mb-8 bg-[#3b2b52] rounded-xl overflow-hidden">
           <ActionGroup
             label="Upload Queue"
             total={totalUpload}
@@ -269,9 +269,9 @@ export default async function DashboardPage() {
           />
         </div>
       ) : (
-        <div className="mb-8 bg-[#2B3428] rounded-xl px-5 py-6 flex items-center gap-4">
+        <div className="mb-8 bg-[#3b2b52] rounded-xl px-5 py-6 flex items-center gap-4">
           <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-          <p className="text-sm text-[#F5F1EB] font-medium">All clear — no pending actions across any client.</p>
+          <p className="text-sm text-[#f0d7c0] font-medium">All clear — no pending actions across any client.</p>
         </div>
       )}
 
@@ -297,7 +297,7 @@ export default async function DashboardPage() {
               {/* Header */}
               <div className="px-4 pt-4 pb-3 border-b border-stone-100 flex items-start justify-between">
                 <div>
-                  <h2 className="font-serif text-lg font-medium text-[#2B3428] tracking-wide leading-tight">
+                  <h2 className="font-serif text-lg font-medium text-[#3b2b52] tracking-wide leading-tight">
                     {client.name}
                   </h2>
                   <p className="text-[10px] tracking-[0.1em] text-stone-400 uppercase mt-0.5">
@@ -323,7 +323,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="w-full bg-stone-100 rounded-full h-1.5">
                     <div
-                      className={`h-1.5 rounded-full ${isMaxed ? 'bg-emerald-500' : 'bg-[#C4A263]'}`}
+                      className={`h-1.5 rounded-full ${isMaxed ? 'bg-emerald-500' : 'bg-[#d4865e]'}`}
                       style={{ width: `${Math.min(100, (currentDelivery.delivered / currentDelivery.quota) * 100)}%` }}
                     />
                   </div>
@@ -383,7 +383,7 @@ export default async function DashboardPage() {
       {/* ── Leaderboard ── */}
       {leaderboard.length > 0 && (
         <div className="mt-8 bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
-          <div className="bg-[#2B3428] px-5 py-4">
+          <div className="bg-[#3b2b52] px-5 py-4">
             <SectionOpener label={`${monthLabel} Leaderboard`} />
             <p className="text-[10px] text-[#A8A09A] uppercase tracking-[0.12em]">Assets Delivered This Month</p>
           </div>
@@ -391,7 +391,7 @@ export default async function DashboardPage() {
             {leaderboard.map((entry, i) => {
               const pct      = Math.round((entry.count / leaderboard[0].count) * 100)
               const medal    = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
-              const barColor = i === 0 ? 'bg-[#C4A263]' : i === 1 ? 'bg-stone-400' : i === 2 ? 'bg-orange-300' : 'bg-stone-300'
+              const barColor = i === 0 ? 'bg-[#d4865e]' : i === 1 ? 'bg-stone-400' : i === 2 ? 'bg-orange-300' : 'bg-stone-300'
               return (
                 <div key={entry.name} className={`flex items-center gap-4 px-5 py-3 ${i === 0 ? 'bg-amber-50/50' : ''}`}>
                   <span className="text-lg w-7 text-center flex-shrink-0">
@@ -401,7 +401,7 @@ export default async function DashboardPage() {
                   <div className="flex-1 bg-stone-100 rounded-full h-2 overflow-hidden">
                     <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <span className={`text-base font-bold w-8 text-right flex-shrink-0 ${i === 0 ? 'text-[#C4A263]' : 'text-stone-600'}`}>
+                  <span className={`text-base font-bold w-8 text-right flex-shrink-0 ${i === 0 ? 'text-[#d4865e]' : 'text-stone-600'}`}>
                     {entry.count}
                   </span>
                 </div>

@@ -85,7 +85,7 @@ export default async function ClientPage({ params, searchParams }: Props) {
     <div>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-stone-400 mb-5 tracking-wide">
-        <Link href="/" className="hover:text-[#2B3428] transition-colors">Dashboard</Link>
+        <Link href="/" className="hover:text-[#3b2b52] transition-colors">Dashboard</Link>
         <span className="text-stone-300">/</span>
         <span className="text-stone-600">{client.name}</span>
       </div>
@@ -93,10 +93,10 @@ export default async function ClientPage({ params, searchParams }: Props) {
       {/* Client header */}
       <div className="flex items-end justify-between mb-7">
         <div>
-          <p className="text-[10px] tracking-[0.18em] text-[#C4A263] uppercase font-medium mb-1">Client</p>
+          <p className="text-[10px] tracking-[0.18em] text-[#d4865e] uppercase font-medium mb-1">Client</p>
           <h1
             className="font-serif text-4xl font-light tracking-wide"
-            style={{ color: client.color_hex ?? '#2B3428' }}
+            style={{ color: client.color_hex ?? '#3b2b52' }}
           >
             {client.name}
           </h1>
@@ -106,7 +106,7 @@ export default async function ClientPage({ params, searchParams }: Props) {
             href={client.drive_url}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 text-xs text-[#C4A263] hover:text-[#D4B373] tracking-[0.12em] uppercase transition-colors border border-[#C4A263]/30 hover:border-[#C4A263] rounded-lg px-3 py-2"
+            className="flex items-center gap-1.5 text-xs text-[#d4865e] hover:text-[#e0a07d] tracking-[0.12em] uppercase transition-colors border border-[#d4865e]/30 hover:border-[#d4865e] rounded-lg px-3 py-2"
           >
             Open Drive
             <svg className="w-3 h-3 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">

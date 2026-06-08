@@ -4,10 +4,10 @@
 
 @layer base {
   :root {
-    --color-dark:  #2B3428;
-    --color-stone: #F2EDE7;
-    --color-gold:  #C4A263;
-    --color-cream: #F5F1EB;
+    --color-dark:  #3b2b52;
+    --color-stone: #f4e7da;
+    --color-gold:  #d4865e;
+    --color-cream: #f0d7c0;
   }
 
   /* Ensure Cormorant Garamond is used by .font-serif */

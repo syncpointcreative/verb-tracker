@@ -54,7 +54,7 @@ const STAGE_STYLE: Record<Stage, {
   description: string
 }> = {
   Awareness: {
-    headerBg:    'bg-[#2B3428]',
+    headerBg:    'bg-[#3b2b52]',
     accentColor: 'text-rose-300',
     accentBg:    'bg-rose-300',
     accentLabel: 'Awareness',
@@ -64,7 +64,7 @@ const STAGE_STYLE: Record<Stage, {
     description: 'Stop the scroll. Introduce the brand.',
   },
   Consideration: {
-    headerBg:    'bg-[#2B3428]',
+    headerBg:    'bg-[#3b2b52]',
     accentColor: 'text-amber-300',
     accentBg:    'bg-amber-300',
     accentLabel: 'Consideration',
@@ -74,7 +74,7 @@ const STAGE_STYLE: Record<Stage, {
     description: 'Educate. Build desire. Differentiate.',
   },
   Conversion: {
-    headerBg:    'bg-[#2B3428]',
+    headerBg:    'bg-[#3b2b52]',
     accentColor: 'text-emerald-300',
     accentBg:    'bg-emerald-300',
     accentLabel: 'Conversion',
@@ -144,7 +144,7 @@ function NotesCell({ value, assetId }: { value: string | null; assetId: string }
       onBlur={save}
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
       placeholder="Add a note…" disabled={saving}
-      className="w-full bg-transparent border-b border-transparent hover:border-stone-200 focus:border-[#C4A263] focus:outline-none px-0 py-0.5 text-xs text-stone-600 placeholder-stone-300 disabled:opacity-50 transition-colors"
+      className="w-full bg-transparent border-b border-transparent hover:border-stone-200 focus:border-[#d4865e] focus:outline-none px-0 py-0.5 text-xs text-stone-600 placeholder-stone-300 disabled:opacity-50 transition-colors"
     />
   )
 }
@@ -229,8 +229,8 @@ const CONTENT_TYPES = [
 ]
 
 // Input / select styles
-const selectCls = "border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40 focus:border-[#C4A263]"
-const activeSelectCls = "border-[#C4A263] rounded-lg px-2.5 py-1.5 text-sm text-[#2B3428] bg-amber-50 focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40"
+const selectCls = "border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#d4865e]/40 focus:border-[#d4865e]"
+const activeSelectCls = "border-[#d4865e] rounded-lg px-2.5 py-1.5 text-sm text-[#3b2b52] bg-amber-50 focus:outline-none focus:ring-2 focus:ring-[#d4865e]/40"
 
 // Status summary strip
 const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: string; dot: string; activeBg: string }[] = [
@@ -270,7 +270,7 @@ function PullModal({ asset, onConfirm, onCancel }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onCancel}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs" onClick={e => e.stopPropagation()}>
-        <div className="bg-[#2B3428] rounded-t-2xl px-5 py-4">
+        <div className="bg-[#3b2b52] rounded-t-2xl px-5 py-4">
           <p className="text-[10px] text-white/40 tracking-widest uppercase mb-1">Pull asset</p>
           <p className="font-serif text-white text-base leading-snug line-clamp-2">{asset.asset_name}</p>
         </div>
@@ -283,7 +283,7 @@ function PullModal({ asset, onConfirm, onCancel }: {
                 onClick={() => setPerformance(performance === opt.value ? null : opt.value)}
                 className={`flex-1 text-xs py-2.5 rounded-xl border transition-all font-medium ${
                   performance === opt.value
-                    ? 'bg-[#2B3428] text-white border-[#2B3428] shadow-sm'
+                    ? 'bg-[#3b2b52] text-white border-[#3b2b52] shadow-sm'
                     : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700 bg-white'
                 }`}
               >
@@ -303,7 +303,7 @@ function PullModal({ asset, onConfirm, onCancel }: {
             <button onClick={onCancel} className="flex-1 text-xs py-2.5 rounded-xl border border-stone-200 text-stone-500 hover:border-stone-300 transition-colors">
               Cancel
             </button>
-            <button onClick={handleConfirm} disabled={saving} className="flex-1 text-xs py-2.5 rounded-xl bg-[#2B3428] text-white hover:bg-[#3a4636] transition-colors disabled:opacity-50">
+            <button onClick={handleConfirm} disabled={saving} className="flex-1 text-xs py-2.5 rounded-xl bg-[#3b2b52] text-white hover:bg-[#4c3a6b] transition-colors disabled:opacity-50">
               {saving ? 'Pulling…' : 'Confirm Pull'}
             </button>
           </div>
@@ -502,7 +502,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
         <td className="px-3 py-2">
           {editMode ? (
             <select value={curProdId ?? ''} onChange={e => setPendingField(asset.id, 'product_id', e.target.value)}
-              className="w-full border border-stone-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
+              className="w-full border border-stone-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]">
               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           ) : (
@@ -515,7 +515,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
             <button
               onClick={() => setPreviewAsset(asset)}
-              className="font-medium text-sm text-stone-900 leading-tight text-left hover:text-[#C4A263] transition-colors group/name"
+              className="font-medium text-sm text-stone-900 leading-tight text-left hover:text-[#d4865e] transition-colors group/name"
               title="Click to preview"
             >
               {asset.asset_name}
@@ -529,7 +529,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           </div>
           {editMode ? (
             <select value={curType ?? ''} onChange={e => setPendingField(asset.id, 'content_type', e.target.value || null)}
-              className="mt-1 w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
+              className="mt-1 w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]">
               <option value="">—</option>
               {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -558,7 +558,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           {editMode ? (
             <input type="text" value={curBy ?? ''} onChange={e => setPendingField(asset.id, 'posted_by', e.target.value || null)}
               placeholder="Creator"
-              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]" />
+              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]" />
           ) : (
             <span className="text-stone-400 text-xs">{asset.posted_by ?? '—'}</span>
           )}
@@ -578,7 +578,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
         {editMode && (
           <td className="px-3 py-2">
             <select value={curStage} onChange={e => setPendingField(asset.id, 'stage', e.target.value)}
-              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C4A263]">
+              className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]">
               {['Awareness', 'Consideration', 'Conversion'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </td>
@@ -664,7 +664,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search assets…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#C4A263]/40 focus:border-[#C4A263] w-48 transition-colors placeholder:text-stone-300"
+            className="pl-8 pr-3 py-1.5 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#d4865e]/40 focus:border-[#d4865e] w-48 transition-colors placeholder:text-stone-300"
           />
         </div>
 
@@ -701,13 +701,13 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
                 Cancel
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="text-sm font-medium text-white bg-[#2B3428] hover:bg-[#3a4636] px-4 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
+                className="text-sm font-medium text-white bg-[#3b2b52] hover:bg-[#4c3a6b] px-4 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
                 {saving ? 'Saving…' : `Save${Object.keys(pending).length ? ` (${Object.keys(pending).length})` : ''}`}
               </button>
             </>
           ) : (
             <button onClick={() => setEditMode(true)}
-              className="text-sm text-[#2B3428] hover:text-[#C4A263] px-3 py-1.5 rounded-lg border border-stone-200 hover:border-[#C4A263] bg-white transition-colors">
+              className="text-sm text-[#3b2b52] hover:text-[#d4865e] px-3 py-1.5 rounded-lg border border-stone-200 hover:border-[#d4865e] bg-white transition-colors">
               ✎ Edit
             </button>
           )}
@@ -717,7 +717,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
       {/* ── Pending Review queue ── */}
       {pendingReview.length > 0 && (
         <div className="mb-5">
-          <div className="bg-[#2B3428] px-4 py-3 rounded-t-lg flex items-center justify-between">
+          <div className="bg-[#3b2b52] px-4 py-3 rounded-t-lg flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-6 h-px bg-violet-400" />
               <span className="text-[10px] tracking-[0.16em] text-violet-300 uppercase font-medium">Pending Review</span>
@@ -766,7 +766,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
                 <span className={`text-[10px] tracking-[0.18em] ${s.accentColor} uppercase font-medium`}>
                   {s.accentLabel}
                 </span>
-                <span className="font-serif italic text-sm text-[#F5F1EB]/70 font-light hidden sm:inline">
+                <span className="font-serif italic text-sm text-[#f0d7c0]/70 font-light hidden sm:inline">
                   {s.description}
                 </span>
               </div>

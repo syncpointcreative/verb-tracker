@@ -60,7 +60,7 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
   const tabCls = (active: boolean) =>
     `px-4 py-2 text-sm tracking-wide transition-colors rounded-lg ${
       active
-        ? 'bg-[#2B3428] text-[#F5F1EB] font-medium'
+        ? 'bg-[#3b2b52] text-[#f0d7c0] font-medium'
         : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100'
     }`
 
@@ -110,8 +110,8 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
             <div className="mt-8">
               {/* Section opener */}
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-px bg-[#C4A263]" />
-                <p className="text-[10px] tracking-[0.18em] text-[#C4A263] uppercase font-medium">
+                <div className="w-8 h-px bg-[#d4865e]" />
+                <p className="text-[10px] tracking-[0.18em] text-[#d4865e] uppercase font-medium">
                   Coverage Gaps
                 </p>
               </div>
@@ -195,7 +195,7 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
                               onClick={() => restoreAsset(asset)}
                               disabled={restoringId === asset.id}
                               title="Click to restore to Ready to Upload"
-                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all hover:ring-2 hover:ring-offset-1 hover:ring-[#C4A263]/50 disabled:opacity-50 cursor-pointer ${cfg.bg} ${cfg.text}`}
+                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all hover:ring-2 hover:ring-offset-1 hover:ring-[#d4865e]/50 disabled:opacity-50 cursor-pointer ${cfg.bg} ${cfg.text}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                               {restoringId === asset.id ? 'Restoring…' : asset.status}
@@ -213,7 +213,7 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
                                   body: JSON.stringify({ performance: val }),
                                 })
                               }}
-                              className={`text-[10px] border rounded-full px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#C4A263]/40 ${perfColor}`}
+                              className={`text-[10px] border rounded-full px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#d4865e]/40 ${perfColor}`}
                             >
                               <option value="">— Rate it —</option>
                               <option value="High Performer">High Performer</option>

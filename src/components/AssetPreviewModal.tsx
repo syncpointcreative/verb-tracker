@@ -80,7 +80,7 @@ export function AssetPreviewModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#2B3428] px-5 py-4 flex items-start justify-between gap-4 flex-shrink-0">
+        <div className="bg-[#3b2b52] px-5 py-4 flex items-start justify-between gap-4 flex-shrink-0">
           <div className="min-w-0">
             <p className="font-serif text-white text-base leading-snug truncate">
               {asset.asset_name}
@@ -236,7 +236,7 @@ export function AssetPreviewModal({
               <a
                 href={`/api/download?id=${meta!.drive_queue_id}`}
                 download
-                className="text-[11px] font-medium text-white bg-[#2B3428] hover:bg-[#3a4636] px-3 py-1.5 rounded-lg transition-colors"
+                className="text-[11px] font-medium text-white bg-[#3b2b52] hover:bg-[#4c3a6b] px-3 py-1.5 rounded-lg transition-colors"
               >
                 ↓ Download
               </a>
