@@ -144,6 +144,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'LEM',  name: 'Lemonade' },
       { code: 'GLEM', name: 'Grapefruit Lemonade' },
       { code: 'VL',   name: 'Vanilla Latte Protein' },
+      { code: 'CWB',  name: 'Coffee With Benefits' },
     ],
   },
   {
