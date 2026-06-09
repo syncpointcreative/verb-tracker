@@ -31,7 +31,10 @@ import { uploadFile } from '@/lib/storage'
 import { findBoardByName, updateItemLinkColumn } from '@/lib/monday'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
-const BATCH_SIZE = 5 // process up to 5 files per run to stay within timeout
+// Give the function the full Hobby-plan budget — large video uploads can't finish
+// in the default 10s, which was killing the run mid-upload (500s + stuck items).
+export const maxDuration = 60
+const BATCH_SIZE = 3 // small batch so a run reliably finishes within maxDuration
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -40,6 +43,14 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServerClient()
+
+  // Reclaim anything a prior run left mid-flight: if the function was killed
+  // (timeout) while uploading, that item stays "processing" and would jam the
+  // front of the queue forever. Mark such items "error" so the queue moves on.
+  await supabase
+    .from('drive_queue')
+    .update({ status: 'error', error: 'Upload interrupted (run timed out) — re-queue to retry' })
+    .eq('status', 'processing')
 
   // Grab the oldest pending items (one batch at a time)
   const { data: items, error } = await supabase
