@@ -31,7 +31,7 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
   const linkCls = (active: boolean) =>
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 ${
       active
-        ? 'bg-white/10 text-[#f0d7c0]'
+        ? 'bg-[#1b3565] text-[#f0d7c0]'
         : 'text-[#A8A09A] hover:text-[#f0d7c0] hover:bg-white/5'
     }`
 

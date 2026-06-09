@@ -32,8 +32,11 @@ import {
   type MondayUser,
 } from '@/lib/monday'
 
-// Libby's Slack user ID — only her ✅ reactions trigger Drive upload
+// Approvers whose reactions gate the pipeline (App status, Monday, Drive).
+// Libby is primary; Mia is the backup approver when Libby is out.
 const LIBBY_USER_ID = 'U0B608MGUPJ'
+const MIA_USER_ID   = 'U0B66R3AJVC'
+const APPROVERS = [LIBBY_USER_ID, MIA_USER_ID]
 
 // ─── Slack signature verification ────────────────────────────────────────────
 
@@ -271,6 +274,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
+  // ── Event de-duplication ──────────────────────────────────────────────────
+  // Slack re-delivers an event (same event_id) if we don't ack within 3s, and
+  // the approval work (Monday + Drive) routinely exceeds that — which is exactly
+  // what created duplicate Monday cards and Drive rows. Record the event_id up
+  // front; if it's already recorded this is a re-delivery, so ack and skip.
+  const eventId = payload.event_id as string | undefined
+  if (eventId) {
+    const dedupe = createServerClient()
+    const { error: dupErr } = await dedupe.from('slack_events').insert({ event_id: eventId })
+    if (dupErr?.code === '23505') {
+      return NextResponse.json({ ok: true, duplicate: true })
+    }
+    if (dupErr) console.error('[slack] dedupe insert error (failing open):', dupErr)
+  }
+
   // Only handle events from our channel
   const event = payload.event as Record<string, unknown> | undefined
   if (!event) return NextResponse.json({ ok: true })
@@ -283,7 +301,7 @@ export async function POST(req: NextRequest) {
     const itemChannel = item?.channel as string | undefined
     const messageTs   = item?.ts as string | undefined
 
-    if (userId === LIBBY_USER_ID && itemChannel === SLACK_CHANNEL_ID && messageTs) {
+    if (userId && APPROVERS.includes(userId) && itemChannel === SLACK_CHANNEL_ID && messageTs) {
       if (reaction === 'white_check_mark') {
         // ✅ — approve for ads + counts toward monthly asset counter + Monday item
         await queueApprovedFiles(messageTs)
