@@ -63,6 +63,8 @@ export interface ScoredNeed {
   benchCandidate: NeedAsset | null
   /** Queued replacement (Ready to Upload / Pending Review) covering this slot. */
   queuedReplacement: NeedAsset | null
+  /** How many replacements are queued for this slot — annotates a proven-decay FYI. */
+  queuedCount: number
   score: number
 }
 
@@ -129,10 +131,12 @@ export function scoreNeeds(allAssets: NeedAsset[], opts: ScoreOpts): ClientNeeds
 
   // Index the pipeline: queued replacements, by client:product:stage.
   const queued = new Map<string, NeedAsset>()
+  const queuedCount = new Map<string, number>()
   for (const a of live) {
     if (QUEUED.has(a.status)) {
       const k = comboKey(a)
       if (!queued.has(k)) queued.set(k, a)
+      queuedCount.set(k, (queuedCount.get(k) ?? 0) + 1)
     }
   }
 
@@ -157,12 +161,16 @@ export function scoreNeeds(allAssets: NeedAsset[], opts: ScoreOpts): ClientNeeds
     const benchCandidate = bench.get(k) ?? null
 
     let bucket: NeedBucket
-    if (queuedReplacement) {
+    if (a.performance === 'High Performer') {
+      // A proven winner aging out always surfaces — even when replacements are
+      // queued. Generic queued creative ≠ a refresh of the proven concept, so
+      // we flag it (annotated with the queue below) rather than let a winner
+      // die quietly while unproven swings ship in its place.
+      bucket = 'provenDecay'
+    } else if (queuedReplacement) {
       bucket = 'covered'
     } else if (benchCandidate) {
       bucket = 'reactivate'
-    } else if (a.performance === 'High Performer') {
-      bucket = 'provenDecay'
     } else if (a.performance === 'Poor Performer') {
       bucket = 'lowPriority'
     } else if (a.status === 'Needs Refresh / Missing' && !a.performance) {
@@ -180,7 +188,7 @@ export function scoreNeeds(allAssets: NeedAsset[], opts: ScoreOpts): ClientNeeds
       counts: { provenDecay: 0, reactivate: 0, standard: 0, lowPriority: 0, covered: 0 },
       actionable: 0,
     }
-    cn.needs.push({ asset: a, daysLive, daysOver, bucket, benchCandidate, queuedReplacement, score })
+    cn.needs.push({ asset: a, daysLive, daysOver, bucket, benchCandidate, queuedReplacement, queuedCount: queuedCount.get(k) ?? 0, score })
     cn.counts[bucket]++
     byClient.set(a.client.id, cn)
   }
@@ -254,6 +262,11 @@ function needLine(n: ScoredNeed): string {
   if (n.bucket === 'reactivate' && n.benchCandidate) {
     const bn = n.benchCandidate.asset_name ?? 'bench asset'
     line += `\n        ↳ _bench: relaunch *${bn}* (pulled High Performer) — no new production needed_`
+  }
+  if (n.bucket === 'provenDecay') {
+    line += n.queuedCount > 0
+      ? `\n        ↳ _${n.queuedCount} replacement${n.queuedCount !== 1 ? 's' : ''} queued — make sure one carries this proven concept, don't just ship the new swings_`
+      : `\n        ↳ _no refresh queued — get a fresh take on this winner in before the concept fades_`
   }
   return line
 }
