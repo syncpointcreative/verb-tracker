@@ -33,3 +33,42 @@ export function tierForDays(days: number): FreshnessTier {
   if (days <= 30) return 'stale'
   return 'expired'
 }
+
+/**
+ * Canonical asset bucket — the SINGLE source of truth for status counts in the
+ * dashboard, Kanban board, and asset table.
+ *
+ * These three views used to each classify assets with their own slightly
+ * different logic, so their counts disagreed (e.g. a paused asset was aged into
+ * "stale/expired" on the dashboard but shown as "paused" on the board). Every
+ * view must now route through classifyAsset() so the numbers reconcile by
+ * construction instead of by three hand-maintained copies that drift apart.
+ *
+ *   fresh | monitor | refreshSoon | stale | expired  → live asset, aged by days-live
+ *   paused      → status === 'Paused' (a deliberate off-state, never aged)
+ *   notLive     → not yet live (Ready to Upload, or no date_live)
+ *   excluded    → out of the freshness picture entirely (Pulled, Removed by Request, Pending Review)
+ */
+export type AssetBucket = FreshnessTier | 'paused' | 'notLive' | 'excluded'
+
+/** Statuses that never participate in freshness aging. */
+const EXCLUDED_STATUSES = ['Pulled', 'Removed by Request', 'Pending Review']
+
+export function classifyAsset(asset: { status?: string | null; date_live?: string | null }): AssetBucket {
+  const status = asset.status ?? ''
+  if (EXCLUDED_STATUSES.includes(status)) return 'excluded'
+  if (status === 'Paused')                return 'paused'
+  if (status === 'Expired')               return 'expired'   // explicitly retired → expired tier
+  if (status === 'Ready to Upload' || !asset.date_live) return 'notLive'
+  return tierForDays(daysLive(asset.date_live))
+}
+
+/** True only for the freshness "stale" tier (22–30 days live). */
+export function isStaleBucket(asset: { status?: string | null; date_live?: string | null }): boolean {
+  return classifyAsset(asset) === 'stale'
+}
+
+/** True only for the freshness "expired" tier (>30 days live, or status Expired). */
+export function isExpiredBucket(asset: { status?: string | null; date_live?: string | null }): boolean {
+  return classifyAsset(asset) === 'expired'
+}

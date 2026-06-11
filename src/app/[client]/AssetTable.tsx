@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive, tierForDays } from '@/lib/freshness'
+import { daysLive, classifyAsset } from '@/lib/freshness'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
@@ -20,14 +20,20 @@ interface PendingChange {
 // Statuses shown in the main stage tables (active assets)
 const ACTIVE_STATUSES: AssetStatus[] = ['Ready to Upload', 'Live / Running', 'Paused', 'Needs Refresh / Missing', 'Expired']
 
-// Pseudo-status for the Stale quick-filter (Stale is a freshness tier, not a status)
+// Pseudo-statuses for the freshness quick-filters (Stale/Expired are freshness
+// tiers, not stored statuses). Both route through the shared classifier so the
+// counts match the dashboard and Kanban board exactly.
 const STALE_FILTER = '__stale__'
+const EXPIRED_FILTER = '__expired__'
 
 /** A live asset whose freshness tier is "Stale" (22–30 days live). */
 function isStaleRow(a: Asset): boolean {
-  if (!a.date_live) return false
-  if (['Pending Review', 'Pulled', 'Removed by Request', 'Paused'].includes(a.status)) return false
-  return tierForDays(daysLive(a.date_live)) === 'stale'
+  return classifyAsset(a) === 'stale'
+}
+
+/** Freshness tier "Expired" (>30 days live, or status Expired). */
+function isExpiredRow(a: Asset): boolean {
+  return classifyAsset(a) === 'expired'
 }
 
 // Valid next-state transitions per current status
@@ -101,6 +107,9 @@ function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status:
   }
   if (status === 'Paused') {
     return <span className="text-sky-500 text-xs font-medium">Paused ⏸</span>
+  }
+  if (status === 'Expired') {
+    return <span className="text-stone-500 text-xs font-medium">Expired</span>
   }
   if (status === 'Ready to Upload' || !dateLive) {
     return <span className="text-stone-300 text-xs">Not live</span>
@@ -239,7 +248,8 @@ const STATUS_STRIP: { status: AssetStatus; label: string; bg: string; text: stri
   { status: 'Live / Running',          label: 'Live',          bg: 'bg-emerald-100', text: 'text-emerald-700',dot: 'bg-emerald-400', activeBg: 'bg-emerald-200' },
   { status: 'Paused',                  label: 'Paused',        bg: 'bg-sky-100',     text: 'text-sky-700',    dot: 'bg-sky-400',     activeBg: 'bg-sky-200'     },
   { status: 'Needs Refresh / Missing', label: 'Needs Refresh', bg: 'bg-amber-100',   text: 'text-amber-700',  dot: 'bg-amber-400',   activeBg: 'bg-amber-200'   },
-  { status: 'Expired',                 label: 'Expired',       bg: 'bg-stone-100',   text: 'text-stone-500',  dot: 'bg-stone-400',   activeBg: 'bg-stone-200'   },
+  // 'Expired' status omitted — surfaced by the freshness Expired chip (which
+  // also catches assets aged past 30 days), so it isn't double-represented.
 ]
 
 // ─── Pull (rate performance) modal ────────────────────────────────────────────
@@ -356,7 +366,8 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
     return counts
   }, [localAssets])
 
-  const staleCount = useMemo(() => localAssets.filter(isStaleRow).length, [localAssets])
+  const staleCount   = useMemo(() => localAssets.filter(isStaleRow).length, [localAssets])
+  const expiredCount = useMemo(() => localAssets.filter(isExpiredRow).length, [localAssets])
 
   const filteredAssets = useMemo(() => {
     let result = localAssets
@@ -364,6 +375,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
     if (selectedProductId)   result = result.filter(a => a.product_id === selectedProductId)
     if (selectedCreator)     result = result.filter(a => a.posted_by === selectedCreator)
     if (selectedStatus === STALE_FILTER) result = result.filter(isStaleRow)
+    else if (selectedStatus === EXPIRED_FILTER) result = result.filter(isExpiredRow)
     else if (selectedStatus) result = result.filter(a => a.status === selectedStatus)
     if (selectedContentType) result = result.filter(a => a.content_type === selectedContentType)
     return [...result].sort((a, b) => {
@@ -643,6 +655,19 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
             {staleCount} Stale
+          </button>
+        )}
+        {expiredCount > 0 && (
+          <button
+            onClick={() => setSelectedStatus(selectedStatus === EXPIRED_FILTER ? '' : EXPIRED_FILTER)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+              selectedStatus === EXPIRED_FILTER
+                ? 'bg-stone-200 text-stone-700 border-current ring-2 ring-offset-1 ring-current'
+                : 'bg-stone-100 text-stone-500 border-transparent hover:opacity-90'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+            {expiredCount} Expired
           </button>
         )}
         {selectedStatus && (

@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive } from '@/lib/freshness'
+import { daysLive, classifyAsset } from '@/lib/freshness'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
@@ -19,28 +19,24 @@ interface Props {
 
 // ── Freshness ────────────────────────────────────────────────────────────────
 
-function getFreshness(asset: Asset): { days: number } | 'not-live' | 'paused' | null {
-  if (['Pulled', 'Removed by Request', 'Pending Review'].includes(asset.status)) return null
-  if (asset.status === 'Paused') return 'paused'
-  if (!asset.date_live) return 'not-live'
-  const days = daysLive(asset.date_live)
-  return { days }
-}
-
 function FreshnessPill({ asset }: { asset: Asset }) {
-  const f = getFreshness(asset)
-  if (f === null) return null
-  if (f === 'not-live') return (
+  // Single source of truth — same classifier the dashboard and table use.
+  const bucket = classifyAsset(asset)
+  if (bucket === 'excluded') return null
+  if (bucket === 'notLive') return (
     <span className="text-[10px] tracking-wide text-stone-400 bg-stone-100 border border-stone-200 rounded-full px-2 py-0.5">Not live</span>
   )
-  if (f === 'paused') return (
+  if (bucket === 'paused') return (
     <span className="text-[10px] tracking-wide text-sky-600 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5">⏸ Paused</span>
   )
-  const { days } = f
-  if (days <= 7)  return <span className="text-[10px] tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{days}d · Fresh</span>
-  if (days <= 14) return <span className="text-[10px] tracking-wide text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">{days}d · Monitor</span>
-  if (days <= 21) return <span className="text-[10px] tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{days}d · Refresh</span>
-  return <span className="text-[10px] tracking-wide text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">{days}d · Stale</span>
+  const days = asset.date_live ? daysLive(asset.date_live) : 0
+  const label = (txt: string, cls: string) =>
+    <span className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 ${cls}`}>{txt}</span>
+  if (bucket === 'fresh')       return label(`${days}d · Fresh`,   'text-emerald-700 bg-emerald-50 border border-emerald-200')
+  if (bucket === 'monitor')     return label(`${days}d · Monitor`, 'text-blue-700 bg-blue-50 border border-blue-200')
+  if (bucket === 'refreshSoon') return label(`${days}d · Refresh`, 'text-amber-700 bg-amber-50 border border-amber-200')
+  if (bucket === 'stale')       return label(`${days}d · Stale`,   'text-red-700 bg-red-50 border border-red-200')
+  return label(asset.date_live ? `${days}d · Expired` : 'Expired',  'text-stone-600 bg-stone-100 border border-stone-300')
 }
 
 // ── Column config ─────────────────────────────────────────────────────────────
@@ -627,20 +623,26 @@ function KanbanColumn({
 
 // ── Filter bar ────────────────────────────────────────────────────────────────
 
+// 'Expired' is intentionally absent — it's surfaced by the freshness Expired
+// chip below (which also catches assets aged past 30 days), so a separate
+// status chip would double-represent the same assets.
 const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Ready to Upload',
   'Pending Review',
   'Live / Running',
   'Paused',
   'Needs Refresh / Missing',
-  'Expired',
 ]
 
 const STALE_FILTER = '__stale__'
+const EXPIRED_FILTER = '__expired__'
 
 function isStale(asset: Asset): boolean {
-  const f = getFreshness(asset)
-  return typeof f === 'object' && f !== null && f.days > 21
+  return classifyAsset(asset) === 'stale'
+}
+
+function isExpired(asset: Asset): boolean {
+  return classifyAsset(asset) === 'expired'
 }
 
 function FilterBar({
@@ -648,11 +650,13 @@ function FilterBar({
   onFilter,
   counts,
   staleCount,
+  expiredCount,
 }: {
   activeFilter: string | null
   onFilter: (s: string | null) => void
   counts: Record<string, number>
   staleCount: number
+  expiredCount: number
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -701,6 +705,22 @@ function FilterBar({
           Stale
           <span className={`tabular-nums text-[10px] ${activeFilter === STALE_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
             {staleCount}
+          </span>
+        </button>
+      )}
+      {expiredCount > 0 && (
+        <button
+          onClick={() => onFilter(activeFilter === EXPIRED_FILTER ? null : EXPIRED_FILTER)}
+          className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+            activeFilter === EXPIRED_FILTER
+              ? 'bg-stone-200 text-stone-700 border-transparent'
+              : 'text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700 bg-white'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+          Expired
+          <span className={`tabular-nums text-[10px] ${activeFilter === EXPIRED_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
+            {expiredCount}
           </span>
         </button>
       )}
@@ -924,14 +944,17 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     return counts
   }, [localAssets])
 
-  const staleCount = useMemo(() => localAssets.filter(isStale).length, [localAssets])
+  const staleCount   = useMemo(() => localAssets.filter(isStale).length, [localAssets])
+  const expiredCount = useMemo(() => localAssets.filter(isExpired).length, [localAssets])
 
   const byStage = useMemo(() => {
     let filtered = statusFilter === STALE_FILTER
       ? localAssets.filter(isStale)
-      : statusFilter
-        ? localAssets.filter(a => a.status === statusFilter)
-        : localAssets
+      : statusFilter === EXPIRED_FILTER
+        ? localAssets.filter(isExpired)
+        : statusFilter
+          ? localAssets.filter(a => a.status === statusFilter)
+          : localAssets
     if (campaignFilter) {
       filtered = filtered.filter(a => (a.campaigns ?? []).includes(campaignFilter))
     }
@@ -997,6 +1020,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
           onFilter={setStatusFilter}
           counts={statusCounts}
           staleCount={staleCount}
+          expiredCount={expiredCount}
         />
         {/* Campaign filter chips */}
         {localCampaigns.length > 0 && (

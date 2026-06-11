@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { daysLive, tierForDays } from '@/lib/freshness'
+import { classifyAsset } from '@/lib/freshness'
 import type { Client, Asset } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,7 @@ interface FreshnessCounts {
   refreshSoon: number
   stale: number
   expired: number
+  paused: number
 }
 
 interface ClientSummary {
@@ -38,23 +39,13 @@ interface ClientSummary {
 // ─── Freshness helpers ────────────────────────────────────────────────────────
 
 const FRESHNESS_TIERS = [
-  { key: 'fresh',       maxDays: 7,        label: 'Fresh',        dot: 'bg-emerald-400', text: 'text-emerald-700' },
-  { key: 'monitor',     maxDays: 14,       label: 'Monitor',      dot: 'bg-yellow-400',  text: 'text-yellow-700'  },
-  { key: 'refreshSoon', maxDays: 21,       label: 'Refresh Soon', dot: 'bg-orange-400',  text: 'text-orange-700'  },
-  { key: 'stale',       maxDays: 30,       label: 'Stale',        dot: 'bg-red-400',     text: 'text-red-700'     },
-  { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-stone-400',   text: 'text-stone-500'   },
+  { key: 'fresh',       label: 'Fresh',        dot: 'bg-emerald-400', text: 'text-emerald-700' },
+  { key: 'monitor',     label: 'Monitor',      dot: 'bg-yellow-400',  text: 'text-yellow-700'  },
+  { key: 'refreshSoon', label: 'Refresh Soon', dot: 'bg-orange-400',  text: 'text-orange-700'  },
+  { key: 'stale',       label: 'Stale',        dot: 'bg-red-400',     text: 'text-red-700'     },
+  { key: 'expired',     label: 'Expired',      dot: 'bg-stone-400',   text: 'text-stone-500'   },
+  { key: 'paused',      label: 'Paused',       dot: 'bg-sky-400',     text: 'text-sky-600'     },
 ] as const
-
-function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts | null {
-  const status = asset.status ?? ''
-  if (status === 'Ready to Upload') return 'fresh'
-  if (status === 'Expired') return 'expired'
-  // Freshness aging only applies to assets that have actually gone live. Never
-  // age a not-live asset by its content date (date_added) — the board and table
-  // show those as "Not live", so the dashboard must not flag them stale/expired.
-  if (!asset.date_live) return null
-  return tierForDays(daysLive(asset.date_live))
-}
 
 // ─── Billing period helpers ───────────────────────────────────────────────────
 
@@ -132,7 +123,7 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   return clients.map(client => {
     const clientAssets = assetsByClient[client.id] ?? []
     const { currentStart, nextStart, billingDay } = clientPeriods.get(client.id)!
-    const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0 }
+    const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0, paused: 0 }
     const contentTypeCounts: Record<string, number> = {}
     let pendingReview = 0, readyToUpload = 0, needsRefresh = 0, staleCount = 0
 
@@ -141,11 +132,10 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       if (asset.status === 'Ready to Upload')         readyToUpload++
       if (asset.status === 'Needs Refresh / Missing') needsRefresh++
       if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
-      const tier = getFreshnessTier(asset)
-      if (tier) {
-        freshness[tier]++
-        if (tier === 'stale' || tier === 'expired') staleCount++
-      }
+      // Single source of truth — same classifier the board and table use.
+      const bucket = classifyAsset(asset)
+      if (bucket !== 'notLive' && bucket !== 'excluded') freshness[bucket]++
+      if (bucket === 'stale' || bucket === 'expired') staleCount++
       if (asset.content_type) contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
     }
 
