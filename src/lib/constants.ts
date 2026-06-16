@@ -60,7 +60,7 @@ export const ASSET_NEEDS_CHANNEL_ID = process.env.SLACK_ASSET_NEEDS_CHANNEL_ID ?
 export const CLIENT_CODES: Record<string, string> = {
   BIOM: 'Biom', CHOMPS: 'Chomps', HIMA: 'Himapure',
   HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
-  MOMO: 'Momofuku', JOO: 'Joolies',
+  MOMO: 'Momofuku', JOO: 'Joolies', ESW: 'ESW Beauty',
 }
 export const PRODUCT_CODES: Record<string, string> = {
   FT: 'FaceTub',
@@ -89,6 +89,10 @@ export const PRODUCT_CODES: Record<string, string> = {
   ADF: 'All Date Flavors',
   DSBR: 'Date Sours Blue Raspberry', DSPCH: 'Date Sours Peachy',
   DSWM: 'Date Sours Watermelon',     DSCHC: 'Date Sours Cherry Cola',
+  // ESW Beauty
+  SCR: 'Strawberry Coco Rose', BSK: 'Beauty Sleep Kit',
+  RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
+  GHK: 'Get Hydrated Kit',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
