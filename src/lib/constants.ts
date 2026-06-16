@@ -90,6 +90,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   DSBR: 'Date Sours Blue Raspberry', DSPCH: 'Date Sours Peachy',
   DSWM: 'Date Sours Watermelon',     DSCHC: 'Date Sours Cherry Cola',
   // ESW Beauty
+  MBP: 'Multiple Beauty Products', SMLE: 'Strawberry Matcha Latte Eye Patch',
+  'S&CM': 'Strawberry & Cream Mask', MIST: 'Mist', GLP: 'Gloss Lip Treatments',
   SCR: 'Strawberry Coco Rose', BSK: 'Beauty Sleep Kit',
   RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
   GHK: 'Get Hydrated Kit',
