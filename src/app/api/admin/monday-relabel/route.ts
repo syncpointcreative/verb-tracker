@@ -54,6 +54,7 @@ async function fetchItems(ids: string[]): Promise<Map<string, MondayItem>> {
   return items
 }
 
+// Maintenance endpoint: dry-run/diagnostics/probe + scoped (category-filtered) apply.
 export async function POST(req: NextRequest) {
   if (!process.env.MONDAY_API_TOKEN) {
     return NextResponse.json({ error: 'MONDAY_API_TOKEN not configured' }, { status: 500 })
