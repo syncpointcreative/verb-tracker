@@ -59,6 +59,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'MONDAY_API_TOKEN not configured' }, { status: 500 })
   }
   const apply = req.nextUrl.searchParams.get('apply') === '1'
+  const debug = req.nextUrl.searchParams.get('debug') === '1'
+  // Optional category filter so apply can target ONLY a subset (e.g. just the
+  // date-broken cards) and leave everything else untouched.
+  //   ?category=date-only  → only "date-only (broken)"
+  //   ?category=reorder    → only "reorder/format"
+  // Omitted → all categories.
+  const categoryFilter = req.nextUrl.searchParams.get('category')
 
   const supabase = createServerClient()
   const { data: assets, error } = await supabase
@@ -72,17 +79,31 @@ export async function POST(req: NextRequest) {
   const ids  = rows.map(r => r.monday_item_id!).filter(Boolean)
   const current = await fetchItems(ids)
 
-  const DATE_ONLY = /^\d{4,8}$/  // broken cards currently named with just the date code
+  // "Broken" = the current Monday card name carries no real title — it's just the
+  // date code (creator-less files used to mis-read the date as the title), possibly
+  // with stray punctuation/extension residue. Widened from a strict ^\d{4,8}$ so it
+  // also catches "061826.mp4", "06/18/26", "- 061826", etc.
+  const DATE_ONLY = /^[\s\-—–_.\/]*\d{2}[\s\-—–_.\/]*\d{2}[\s\-—–_.\/]*\d{2,4}([\s.\-_].*)?$/
 
+  // Diagnostics for every row so skipped cards are never silent: classify each as
+  // changed / already-correct / not-found-on-monday / no-desired-title.
+  const diagnostics: Array<{ itemId: string; file: string | null; current: string | null; want: string; status: string }> = []
   const changes: Array<{ itemId: string; boardId: string; from: string; to: string; category: string }> = []
   for (const r of rows) {
     const itemId = r.monday_item_id!
     const it = current.get(itemId)
-    if (it == null) continue              // item no longer exists on Monday
     const want = desiredName(r)
-    if (!want || want === it.name) continue  // already correct (or nothing to set)
-    const category = DATE_ONLY.test(it.name.trim()) ? 'date-only (broken)' : 'reorder/format'
-    changes.push({ itemId, boardId: it.boardId, from: it.name, to: want, category })
+    let status: string
+    if (it == null) status = 'not-found-on-monday'
+    else if (!want) status = 'no-desired-title'
+    else if (want === it.name) status = 'already-correct'
+    else status = 'change'
+    diagnostics.push({ itemId, file: r.file_name, current: it?.name ?? null, want, status })
+    if (status !== 'change') continue
+    const category = DATE_ONLY.test(it!.name.trim()) ? 'date-only (broken)' : 'reorder/format'
+    if (categoryFilter === 'date-only' && category !== 'date-only (broken)') continue
+    if (categoryFilter === 'reorder'   && category !== 'reorder/format')     continue
+    changes.push({ itemId, boardId: it!.boardId, from: it!.name, to: want, category })
   }
 
   const byCategory = changes.reduce<Record<string, number>>((acc, c) => {
@@ -106,12 +127,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const statusCounts = diagnostics.reduce<Record<string, number>>((acc, d) => {
+    acc[d.status] = (acc[d.status] ?? 0) + 1
+    return acc
+  }, {})
+
   return NextResponse.json({
     mode: apply ? 'apply' : 'dry-run',
+    categoryFilter: categoryFilter ?? null,
     itemsWithMondayCard: rows.length,
     plannedChanges: changes.length,
     byCategory,
+    statusCounts,
     applied,
     changes,
+    ...(debug ? { diagnostics } : {}),
   })
 }
