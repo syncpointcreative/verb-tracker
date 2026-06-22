@@ -20,7 +20,7 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { parseFilename, inferStage } from '@/lib/parser'
+import { parseFilename, inferStage, validateFilename } from '@/lib/parser'
 import { SLACK_CHANNEL_ID, SLACK_WORKSPACE_URL } from '@/lib/constants'
 import { refreshDeliveredCount } from '@/lib/deliveries'
 import {
@@ -218,7 +218,9 @@ async function createMondayItemsForApproval(
       const parsed    = asset.file_name ? parseFilename(asset.file_name) : null
       const title     = parsed?.title ?? asset.asset_name
       const creator   = asset.posted_by ?? parsed?.postedBy ?? null
-      const itemName  = creator ? `${title} — ${creator}` : title
+      // Label format: "Creator — Title" (creator first). Falls back to title-only
+      // when the filename carries no creator code.
+      const itemName  = creator ? `${creator} — ${title}` : title
 
       try {
         // If the file is already on Drive (uploaded before Monday item creation),
@@ -443,16 +445,19 @@ export async function POST(req: NextRequest) {
   )
 
   let added = 0
-  const unparseable: string[] = []
+  const rejected: Array<{ name: string; reason: string }> = []
 
   for (const slackFile of slackFiles) {
     const { name: fileName, url: slackFileUrl, mimetype: slackMimetype } = slackFile
 
-    const parsed = parseFilename(fileName)
-    if (!parsed.clientName) { unparseable.push(fileName); continue } // no client code → flag, don't drop silently
+    // Naming-convention gate — reject (don't ingest) anything that can't be routed.
+    const check = validateFilename(fileName)
+    if (!check.valid) { rejected.push({ name: fileName, reason: check.reason! }); continue }
 
-    const clientId = clientByName.get(parsed.clientName)
-    if (!clientId) { unparseable.push(fileName); continue }
+    const parsed = parseFilename(fileName)
+
+    const clientId = clientByName.get(parsed.clientName!)
+    if (!clientId) { rejected.push({ name: fileName, reason: 'client code isn’t set up in the tracker yet' }); continue }
 
     // Find best-matching product, or skip if none
     let productId: string | undefined
@@ -509,24 +514,39 @@ export async function POST(req: NextRequest) {
     notes: `Webhook ingest — ${slackFiles.map(f => f.name).join(', ')}`,
   })
 
-  // Surface files we couldn't route (filename missing a known client code) so they
-  // don't vanish silently — post a heads-up back into the submission channel.
-  if (unparseable.length > 0) {
+  // Naming-convention enforcement: reject off-convention files (not ingested) and
+  // flag them so they don't vanish silently. Slack can't block the upload itself
+  // (the webhook fires after the post), so we reply in-thread with the specific
+  // reason and ❌-react the message so the team sees it needs a rename + re-post.
+  if (rejected.length > 0) {
     const token = process.env.SLACK_BOT_TOKEN
     if (token) {
       const text =
-        `:warning: *Couldn't add ${unparseable.length} file(s) to the tracker* — the filename doesn't start with a known client code, so it wasn't assigned to a client.\n` +
-        unparseable.map(n => `• \`${n}\``).join('\n') +
-        `\nPlease rename to *CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE* (e.g. \`JOO-ADF-AWA-MP-CandyAisle-060426.mp4\`) and re-post.`
+        `:no_entry: *Rejected ${rejected.length} file(s) — not added to the tracker.*\n` +
+        `Filenames must follow *CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE* ` +
+        `(CREATOR is optional), e.g. \`CHOMPS-SMK-AWA-LR-SummerHook-061826.mp4\`.\n` +
+        rejected.map(r => `• \`${r.name}\` — ${r.reason}`).join('\n') +
+        `\nPlease rename and re-post.`
       try {
         await fetch('https://slack.com/api/chat.postMessage', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channel: SLACK_CHANNEL_ID, text }),
+          body: JSON.stringify({ channel: SLACK_CHANNEL_ID, text, thread_ts: slackTs ?? undefined }),
         })
       } catch { /* alert is best-effort */ }
+
+      // Visually mark the offending message as rejected.
+      if (slackTs) {
+        try {
+          await fetch('https://slack.com/api/reactions.add', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel: SLACK_CHANNEL_ID, timestamp: slackTs, name: 'x' }),
+          })
+        } catch { /* reaction is best-effort */ }
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, added, flagged: unparseable.length })
+  return NextResponse.json({ ok: true, added, rejected: rejected.length })
 }
