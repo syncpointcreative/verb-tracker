@@ -39,14 +39,22 @@ function desiredName(asset: AssetRow): string {
 
 interface MondayItem { name: string; boardId: string }
 
-/** Fetch current name + board id from Monday in chunks (API caps ids per query). */
+/**
+ * Fetch current name + board id from Monday in chunks.
+ *
+ * CRITICAL: the `items(ids:)` field defaults to `limit: 25`, so a chunk of 50 ids
+ * silently returns only the first 25 — which previously made ~half the board look
+ * "not found" and skipped from the backfill. We pass an explicit `limit` equal to
+ * the chunk size so every requested id comes back.
+ */
 async function fetchItems(ids: string[]): Promise<Map<string, MondayItem>> {
   const items = new Map<string, MondayItem>()
-  for (let i = 0; i < ids.length; i += 50) {
-    const chunk = ids.slice(i, i + 50)
+  const CHUNK = 100  // Monday allows up to 100 ids per items() query
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
     const data = await mondayQuery<{ items: Array<{ id: string; name: string; board: { id: string } | null }> }>(`
-      query($ids: [ID!]) { items(ids: $ids) { id name board { id } } }
-    `, { ids: chunk })
+      query($ids: [ID!], $limit: Int!) { items(ids: $ids, limit: $limit) { id name board { id } } }
+    `, { ids: chunk, limit: chunk.length })
     for (const it of data.items ?? []) {
       if (it.board?.id) items.set(it.id, { name: it.name, boardId: it.board.id })
     }
@@ -142,11 +150,11 @@ export async function POST(req: NextRequest) {
     const missing = diagnostics.filter(d => d.status === 'not-found-on-monday').map(d => d.itemId)
     const raw: Array<{ id: string; name: string; state: string | null; boardId: string | null; parentId: string | null }> = []
     const returnedIds = new Set<string>()
-    for (let i = 0; i < missing.length; i += 50) {
-      const chunk = missing.slice(i, i + 50)
+    for (let i = 0; i < missing.length; i += 100) {
+      const chunk = missing.slice(i, i + 100)
       const data = await mondayQuery<{ items: Array<{ id: string; name: string; state: string | null; board: { id: string } | null; parent_item: { id: string } | null }> }>(`
-        query($ids: [ID!]) { items(ids: $ids) { id name state board { id } parent_item { id } } }
-      `, { ids: chunk })
+        query($ids: [ID!], $limit: Int!) { items(ids: $ids, limit: $limit) { id name state board { id } parent_item { id } } }
+      `, { ids: chunk, limit: chunk.length })
       for (const it of data.items ?? []) {
         returnedIds.add(it.id)
         raw.push({ id: it.id, name: it.name, state: it.state ?? null, boardId: it.board?.id ?? null, parentId: it.parent_item?.id ?? null })
