@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
   }
   const apply = req.nextUrl.searchParams.get('apply') === '1'
   const debug = req.nextUrl.searchParams.get('debug') === '1'
+  const probe = req.nextUrl.searchParams.get('probe') === '1'
   // Optional category filter so apply can target ONLY a subset (e.g. just the
   // date-broken cards) and leave everything else untouched.
   //   ?category=date-only  → only "date-only (broken)"
@@ -132,6 +133,32 @@ export async function POST(req: NextRequest) {
     return acc
   }, {})
 
+  // Raw Monday probe: re-query the not-found IDs with extended fields (state,
+  // board, parent_item) and return Monday's raw rows so we can see exactly why
+  // items(ids:) drops them — archived/deleted state, null board, subitem, etc.
+  let probeResult: unknown = undefined
+  if (probe) {
+    const missing = diagnostics.filter(d => d.status === 'not-found-on-monday').map(d => d.itemId)
+    const raw: Array<{ id: string; name: string; state: string | null; boardId: string | null; parentId: string | null }> = []
+    const returnedIds = new Set<string>()
+    for (let i = 0; i < missing.length; i += 50) {
+      const chunk = missing.slice(i, i + 50)
+      const data = await mondayQuery<{ items: Array<{ id: string; name: string; state: string | null; board: { id: string } | null; parent_item: { id: string } | null }> }>(`
+        query($ids: [ID!]) { items(ids: $ids) { id name state board { id } parent_item { id } } }
+      `, { ids: chunk })
+      for (const it of data.items ?? []) {
+        returnedIds.add(it.id)
+        raw.push({ id: it.id, name: it.name, state: it.state ?? null, boardId: it.board?.id ?? null, parentId: it.parent_item?.id ?? null })
+      }
+    }
+    probeResult = {
+      missingCount: missing.length,
+      returnedByMonday: raw.length,
+      omittedEntirely: missing.filter(id => !returnedIds.has(id)),
+      rows: raw,
+    }
+  }
+
   return NextResponse.json({
     mode: apply ? 'apply' : 'dry-run',
     categoryFilter: categoryFilter ?? null,
@@ -142,5 +169,6 @@ export async function POST(req: NextRequest) {
     applied,
     changes,
     ...(debug ? { diagnostics } : {}),
+    ...(probe ? { probe: probeResult } : {}),
   })
 }
