@@ -3,6 +3,8 @@ import { Inter, Cormorant_Garamond } from 'next/font/google'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
+import { cookies } from 'next/headers'
+import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -30,7 +32,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+async function isAuthed(): Promise<boolean> {
+  const token = cookies().get(SESSION_COOKIE)?.value
+  return verifySessionToken(token, process.env.AUTH_SECRET || '')
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const authed = await isAuthed()
   return (
     <html lang="en">
       <head>
@@ -38,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`${inter.variable} ${cormorant.variable} font-sans bg-[#f4e7da] min-h-screen`}>
+        {!authed ? children : (
         <div className="flex min-h-screen">
 
           {/* ── Desktop sidebar (md+) ── */}
@@ -88,6 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </main>
           </div>
         </div>
+        )}
       </body>
     </html>
   )
