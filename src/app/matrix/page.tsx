@@ -33,6 +33,7 @@ export default async function MatrixPage() {
       Awareness:     { active: 0, total: 0 },
       Consideration: { active: 0, total: 0 },
       Conversion:    { active: 0, total: 0 },
+      'Community Interaction': { active: 0, total: 0 },
     }
   }
 

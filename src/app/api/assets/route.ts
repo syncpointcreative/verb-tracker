@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import type { AssetStatus, Stage } from '@/lib/supabase'
 
-const VALID_STAGES = new Set<Stage>(['Awareness', 'Consideration', 'Conversion'])
+const VALID_STAGES = new Set<Stage>(['Awareness', 'Consideration', 'Conversion', 'Community Interaction'])
 const VALID_STATUSES = new Set<AssetStatus>([
   'Pending Review', 'Ready to Upload', 'Live / Running', 'Paused',
   'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request',

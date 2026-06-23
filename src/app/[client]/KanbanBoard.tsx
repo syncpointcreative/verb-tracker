@@ -56,6 +56,7 @@ const COLUMN: Record<Stage, { accent: string; rule: string; label: string; descr
   Awareness:     { accent: 'text-rose-300',    rule: 'bg-rose-300',    label: 'Awareness',     description: 'Stop the scroll. Introduce the brand.' },
   Consideration: { accent: 'text-amber-300',   rule: 'bg-amber-300',   label: 'Consideration', description: 'Educate. Build desire. Differentiate.'  },
   Conversion:    { accent: 'text-emerald-300', rule: 'bg-emerald-300', label: 'Conversion',    description: 'Drive the click. Close the sale.'       },
+  'Community Interaction': { accent: 'text-sky-300', rule: 'bg-sky-300', label: 'Community Interaction', description: 'Spark conversation. Build community.' },
 }
 
 // ── Pull Modal ────────────────────────────────────────────────────────────────
@@ -942,7 +943,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     if (campaignFilter) {
       filtered = filtered.filter(a => (a.campaigns ?? []).includes(campaignFilter))
     }
-    const grouped: Record<Stage, Asset[]> = { Awareness: [], Consideration: [], Conversion: [] }
+    const grouped: Record<Stage, Asset[]> = { Awareness: [], Consideration: [], Conversion: [], 'Community Interaction': [] }
     for (const a of filtered) {
       if (a.stage in grouped) grouped[a.stage as Stage].push(a)
     }

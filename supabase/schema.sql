@@ -28,7 +28,7 @@ CREATE TABLE assets (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id        UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   product_id       UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  stage            TEXT NOT NULL CHECK (stage IN ('Awareness','Consideration','Conversion')),
+  stage            TEXT NOT NULL CHECK (stage IN ('Awareness','Consideration','Conversion','Community Interaction')),
   asset_name       TEXT NOT NULL,
   content_type     TEXT,
   file_name        TEXT,

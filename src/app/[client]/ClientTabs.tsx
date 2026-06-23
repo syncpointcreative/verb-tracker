@@ -68,11 +68,13 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
     Awareness:     'Hook video — stop the scroll, introduce product',
     Consideration: 'Demo, tutorial, or testimonial showing value',
     Conversion:    'Promo/offer-led video with clear CTA',
+    'Community Interaction': 'Community/engagement-led video (follows, likes, comments, shares)',
   }
   const agingSuggestions: Record<Stage, string> = {
     Awareness:     'Existing creative hitting Refresh Soon — start new hook video',
     Consideration: 'Existing creative aging out — prep fresh demo or testimonial',
     Conversion:    'Existing creative aging out — prep new promo or offer video',
+    'Community Interaction': 'Existing creative aging out — prep new community/engagement video',
   }
 
   return (

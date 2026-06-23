@@ -76,9 +76,10 @@ const STAGE_SUGGESTION: Record<string, string> = {
   Awareness:     'New hook video — stop the scroll, introduce product',
   Consideration: 'Fresh demo, tutorial, or testimonial showing value',
   Conversion:    'New promo/offer-led video with clear CTA',
+  'Community Interaction': 'New community/engagement-led video (follows, likes, comments, shares)',
 }
 
-const STAGES = ['Awareness', 'Consideration', 'Conversion']
+const STAGES = ['Awareness', 'Consideration', 'Conversion', 'Community Interaction']
 
 // ─── Monday: Full weekly alert ───────────────────────────────────────────────
 
