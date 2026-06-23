@@ -1,6 +1,6 @@
 import { Stage, AssetStatus } from './supabase'
 
-export const STAGES: Stage[] = ['Awareness', 'Consideration', 'Conversion', 'Community Interaction']
+export const STAGES: Stage[] = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
 
 export const STAGE_CONFIG = {
   Awareness: {

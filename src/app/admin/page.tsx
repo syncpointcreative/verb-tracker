@@ -17,7 +17,7 @@ interface Asset {
   status: string; date_added: string | null; posted_by: string | null; notes: string | null
 }
 
-const STAGES = ['Awareness', 'Consideration', 'Conversion', 'Community Interaction']
+const STAGES = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
 const STATUSES = ['Pending Review', 'Ready to Upload', 'Live / Running', 'Paused', 'Expired', 'Needs Refresh / Missing', 'Pulled', 'Removed by Request']
 
 function fmt(dateStr: string) {

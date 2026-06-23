@@ -590,7 +590,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           <td className="px-3 py-2">
             <select value={curStage} onChange={e => setPendingField(asset.id, 'stage', e.target.value)}
               className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]">
-              {['Awareness', 'Consideration', 'Conversion', 'Community Interaction'].map(s => <option key={s} value={s}>{s}</option>)}
+              {['Awareness', 'Community Interaction', 'Consideration', 'Conversion'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </td>
         )}

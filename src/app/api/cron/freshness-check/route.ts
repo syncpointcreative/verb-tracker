@@ -79,7 +79,7 @@ const STAGE_SUGGESTION: Record<string, string> = {
   'Community Interaction': 'New community/engagement-led video (follows, likes, comments, shares)',
 }
 
-const STAGES = ['Awareness', 'Consideration', 'Conversion', 'Community Interaction']
+const STAGES = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
 
 // ─── Monday: Full weekly alert ───────────────────────────────────────────────
 
