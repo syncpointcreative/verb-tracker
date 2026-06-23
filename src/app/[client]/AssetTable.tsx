@@ -83,6 +83,16 @@ const STAGE_STYLE: Record<Stage, {
     border:      'border-emerald-100',
     description: 'Drive the click. Close the sale.',
   },
+  'Community Interaction': {
+    headerBg:    'bg-[#2b4252]',
+    accentColor: 'text-sky-300',
+    accentBg:    'bg-sky-300',
+    accentLabel: 'Community Interaction',
+    lightBg:     'bg-sky-50/40',
+    rowBg:       'bg-sky-50/20',
+    border:      'border-sky-100',
+    description: 'Spark conversation. Build community and engagement.',
+  },
 }
 
 // ─── Freshness meter ──────────────────────────────────────────────────────────
@@ -337,7 +347,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
   const [dateSort,             setDateSort]             = useState<'desc' | 'asc'>('desc')
 
   const [collapsed, setCollapsed] = useState<Record<Stage, boolean>>({
-    Awareness: false, Consideration: false, Conversion: false,
+    Awareness: false, Consideration: false, Conversion: false, 'Community Interaction': false,
   })
 
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
@@ -379,6 +389,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
     Awareness:     activeAssets.filter(a => a.stage === 'Awareness'),
     Consideration: activeAssets.filter(a => a.stage === 'Consideration'),
     Conversion:    activeAssets.filter(a => a.stage === 'Conversion'),
+    'Community Interaction': activeAssets.filter(a => a.stage === 'Community Interaction'),
   }
 
   const activeFilterCount = [searchQuery, selectedProductId, selectedCreator, selectedStatus, selectedContentType].filter(Boolean).length
@@ -579,7 +590,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           <td className="px-3 py-2">
             <select value={curStage} onChange={e => setPendingField(asset.id, 'stage', e.target.value)}
               className="w-full border border-stone-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4865e]">
-              {['Awareness', 'Consideration', 'Conversion'].map(s => <option key={s} value={s}>{s}</option>)}
+              {['Awareness', 'Community Interaction', 'Consideration', 'Conversion'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </td>
         )}

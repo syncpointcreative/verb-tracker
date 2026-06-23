@@ -1,6 +1,6 @@
 import { Stage, AssetStatus } from './supabase'
 
-export const STAGES: Stage[] = ['Awareness', 'Consideration', 'Conversion']
+export const STAGES: Stage[] = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
 
 export const STAGE_CONFIG = {
   Awareness: {
@@ -32,6 +32,16 @@ export const STAGE_CONFIG = {
     text: 'text-emerald-900',
     border: 'border-emerald-200',
     badge: 'bg-emerald-100 text-emerald-800',
+  },
+  'Community Interaction': {
+    label: 'Community Interaction',
+    description: 'Spark conversation. Build community and engagement.',
+    headerBg: 'bg-sky-900',
+    lightBg: 'bg-sky-50',
+    rowBg: 'bg-sky-50/50',
+    text: 'text-sky-900',
+    border: 'border-sky-200',
+    badge: 'bg-sky-100 text-sky-800',
   },
 }
 
@@ -104,6 +114,7 @@ export const STAGE_CODES: Record<string, string> = {
   AWA: 'Awareness',
   CON: 'Consideration',
   CVR: 'Conversion',
+  INT: 'Community Interaction',
 }
 
 export const TYPE_CODES: Record<string, string> = {

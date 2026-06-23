@@ -288,7 +288,7 @@ export default function HowToUsePage() {
               </tbody>
             </table>
           </Collapsible>
-          <Collapsible title="Funnel Stage Codes" badge="AWA · CON · CVR">
+          <Collapsible title="Funnel Stage Codes" badge="AWA · CON · CVR · INT">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
                 <tr className="hover:bg-gray-50">
@@ -305,6 +305,11 @@ export default function HowToUsePage() {
                   <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">CVR</td>
                   <td className="px-4 py-2 text-gray-700 font-medium">Conversion</td>
                   <td className="px-4 py-2 text-gray-500">Drive the click. Promo, offer-led, affiliate.</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-500 w-16">INT</td>
+                  <td className="px-4 py-2 text-gray-700 font-medium">Community Interaction</td>
+                  <td className="px-4 py-2 text-gray-500">Spark conversation. Community-led, engagement-driven (follows, likes, comments, shares).</td>
                 </tr>
               </tbody>
             </table>
