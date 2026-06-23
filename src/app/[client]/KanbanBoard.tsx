@@ -1033,8 +1033,8 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
         )}
       </div>
 
-      {/* ── Desktop: 3-column grid ── */}
-      <div className="hidden md:grid grid-cols-3 gap-4">
+      {/* ── Desktop: one column per funnel stage ── */}
+      <div className="hidden md:grid grid-cols-4 gap-3">
         {STAGES.map(stage => (
           <KanbanColumn
             key={stage}
