@@ -33,3 +33,22 @@ export function tierForDays(days: number): FreshnessTier {
   if (days <= 30) return 'stale'
   return 'expired'
 }
+
+/**
+ * Performance-based freshness state, written by the off-platform analyzer
+ * (TikTok spend + stage metrics). When present it supersedes the age tier:
+ * the board judges "is it still worth running" rather than "how old is it".
+ */
+export type FreshnessState =
+  | 'still_performing' | 'underperforming' | 'needs_replacing' | 'under_delivered'
+
+export const FRESHNESS_META: Record<FreshnessState, { emoji: string; label: string; cls: string }> = {
+  still_performing: { emoji: '🟢', label: 'Still performing', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  underperforming:  { emoji: '🟡', label: 'Underperforming',  cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+  needs_replacing:  { emoji: '🔴', label: 'Needs replacing',  cls: 'text-red-700 bg-red-50 border-red-200' },
+  under_delivered:  { emoji: '⏳', label: 'Under-delivered',  cls: 'text-stone-600 bg-stone-100 border-stone-200' },
+}
+
+export function freshnessMeta(state: string | null | undefined) {
+  return state ? FRESHNESS_META[state as FreshnessState] ?? null : null
+}
