@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive } from '@/lib/freshness'
+import { daysLive, freshnessMeta } from '@/lib/freshness'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
@@ -35,6 +35,13 @@ function FreshnessPill({ asset }: { asset: Asset }) {
   )
   if (f === 'paused') return (
     <span className="text-[10px] tracking-wide text-sky-600 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5">⏸ Paused</span>
+  )
+  // Performance-based state (from the analyzer) supersedes the age tier when present.
+  const meta = freshnessMeta(asset.freshness_state)
+  if (meta) return (
+    <span title={asset.freshness_detail ?? ''} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${meta.cls}`}>
+      {meta.emoji} {meta.label}
+    </span>
   )
   const { days } = f
   if (days <= 7)  return <span className="text-[10px] tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{days}d · Fresh</span>

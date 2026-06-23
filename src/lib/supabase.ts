@@ -46,6 +46,9 @@ export interface Asset {
   drive_url:        string | null   // Google Drive webViewLink — set after ✅ approval + cron upload
   monday_item_id:   string | null   // Monday.com item ID — set on ✅ approval (not ✔️)
   performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
+  freshness_state: string | null   // analyzer-written: still_performing | underperforming | needs_replacing | under_delivered
+  freshness_detail: string | null  // human-readable "why" behind the state
+  freshness_scored_at: string | null
   created_at: string
   updated_at: string
   // joined
