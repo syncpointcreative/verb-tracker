@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive, freshnessMeta } from '@/lib/freshness'
+import { daysLive, freshnessMeta, freshnessReasonMeta, isNeedsReplacing } from '@/lib/freshness'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
@@ -38,16 +38,29 @@ function FreshnessPill({ asset }: { asset: Asset }) {
   )
   // Performance-based state (from the analyzer) supersedes the age tier when present.
   const meta = freshnessMeta(asset.freshness_state)
-  if (meta) return (
-    <span title={asset.freshness_detail ?? ''} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${meta.cls}`}>
-      {meta.emoji} {meta.label}
-    </span>
-  )
+  if (meta) {
+    // For "needs replacing", the analyzer also tags WHY — faded vs never-performed.
+    const reason = isNeedsReplacing(asset.freshness_state) ? freshnessReasonMeta(asset.freshness_reason) : null
+    return (
+      <span className="inline-flex items-center gap-1 flex-wrap">
+        <span title={asset.freshness_detail ?? ''} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${meta.cls}`}>
+          {meta.emoji} {meta.label}
+        </span>
+        {reason && (
+          <span title={reason.hint} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${reason.cls}`}>
+            {reason.emoji} {reason.label}
+          </span>
+        )}
+      </span>
+    )
+  }
+  // Age-tier fallback (only for live assets the analyzer hasn't scored yet). This is
+  // an age note, NOT a verdict — "needs replacing" comes only from the analyzer above.
   const { days } = f
   if (days <= 7)  return <span className="text-[10px] tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{days}d · Fresh</span>
   if (days <= 14) return <span className="text-[10px] tracking-wide text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">{days}d · Monitor</span>
   if (days <= 21) return <span className="text-[10px] tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{days}d · Refresh</span>
-  return <span className="text-[10px] tracking-wide text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">{days}d · Stale</span>
+  return <span className="text-[10px] tracking-wide text-stone-500 bg-stone-100 border border-stone-200 rounded-full px-2 py-0.5">{days}d · Aging</span>
 }
 
 // ── Column config ─────────────────────────────────────────────────────────────
@@ -644,11 +657,11 @@ const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Expired',
 ]
 
-const STALE_FILTER = '__stale__'
+const STALE_FILTER = '__needs_replacing__'
 
+// Performance verdict from the analyzer — not an age cutoff.
 function isStale(asset: Asset): boolean {
-  const f = getFreshness(asset)
-  return typeof f === 'object' && f !== null && f.days > 21
+  return isNeedsReplacing(asset.freshness_state)
 }
 
 function FilterBar({
@@ -706,7 +719,7 @@ function FilterBar({
           }`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-          Stale
+          🔴 Needs Replacing
           <span className={`tabular-nums text-[10px] ${activeFilter === STALE_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
             {staleCount}
           </span>

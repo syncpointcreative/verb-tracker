@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { daysLive, tierForDays } from '@/lib/freshness'
+import { FRESHNESS_META, FRESHNESS_STATE_ORDER, type FreshnessState } from '@/lib/freshness'
 import type { Client, Asset } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,13 +12,8 @@ interface MonthlyDelivery {
   quota: number
 }
 
-interface FreshnessCounts {
-  fresh: number
-  monitor: number
-  refreshSoon: number
-  stale: number
-  expired: number
-}
+// Performance-verdict counts (from the analyzer) — the health of what's actually running.
+type FreshnessCounts = Record<FreshnessState, number>
 
 interface ClientSummary {
   client: Client
@@ -32,29 +27,14 @@ interface ClientSummary {
   pendingReview: number
   readyToUpload: number
   needsRefresh: number
-  staleCount: number
+  needsReplacing: number
 }
 
 // ─── Freshness helpers ────────────────────────────────────────────────────────
 
-const FRESHNESS_TIERS = [
-  { key: 'fresh',       maxDays: 7,        label: 'Fresh',        dot: 'bg-emerald-400', text: 'text-emerald-700' },
-  { key: 'monitor',     maxDays: 14,       label: 'Monitor',      dot: 'bg-yellow-400',  text: 'text-yellow-700'  },
-  { key: 'refreshSoon', maxDays: 21,       label: 'Refresh Soon', dot: 'bg-orange-400',  text: 'text-orange-700'  },
-  { key: 'stale',       maxDays: 30,       label: 'Stale',        dot: 'bg-red-400',     text: 'text-red-700'     },
-  { key: 'expired',     maxDays: Infinity, label: 'Expired',      dot: 'bg-stone-400',   text: 'text-stone-500'   },
-] as const
-
-function getFreshnessTier(asset: { date_added: string | null; date_live?: string | null; status?: string }): keyof FreshnessCounts | null {
-  const status = asset.status ?? ''
-  if (status === 'Ready to Upload') return 'fresh'
-  if (status === 'Expired') return 'expired'
-  // Freshness aging only applies to assets that have actually gone live. Never
-  // age a not-live asset by its content date (date_added) — the board and table
-  // show those as "Not live", so the dashboard must not flag them stale/expired.
-  if (!asset.date_live) return null
-  return tierForDays(daysLive(asset.date_live))
-}
+// Dashboard health chips read the analyzer verdict (freshness_state), in
+// most-actionable-first order. Age is no longer a verdict on this page.
+const FRESHNESS_TIERS = FRESHNESS_STATE_ORDER.map(key => ({ key, ...FRESHNESS_META[key] }))
 
 // ─── Billing period helpers ───────────────────────────────────────────────────
 
@@ -110,14 +90,14 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   }
 
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
-    supabase.from('assets').select('client_id, date_added, date_live, status, content_type')
+    supabase.from('assets').select('client_id, date_added, date_live, status, content_type, freshness_state')
       .in('client_id', clients.map(c => c.id)),
     supabase.from('monthly_deliveries').select('*')
       .in('client_id', clients.map(c => c.id))
       .in('month', Array.from(allPeriodStarts)).order('month'),
   ])
 
-  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type'>[]> = {}
+  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type' | 'freshness_state'>[]> = {}
   for (const a of (assets ?? [])) {
     if (!assetsByClient[a.client_id]) assetsByClient[a.client_id] = []
     assetsByClient[a.client_id].push(a)
@@ -132,24 +112,22 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   return clients.map(client => {
     const clientAssets = assetsByClient[client.id] ?? []
     const { currentStart, nextStart, billingDay } = clientPeriods.get(client.id)!
-    const freshness: FreshnessCounts = { fresh: 0, monitor: 0, refreshSoon: 0, stale: 0, expired: 0 }
+    const freshness: FreshnessCounts = { still_performing: 0, underperforming: 0, needs_replacing: 0, under_delivered: 0 }
     const contentTypeCounts: Record<string, number> = {}
-    let pendingReview = 0, readyToUpload = 0, needsRefresh = 0, staleCount = 0
+    let pendingReview = 0, readyToUpload = 0, needsRefresh = 0
 
     for (const asset of clientAssets) {
       if (asset.status === 'Pending Review')          pendingReview++
       if (asset.status === 'Ready to Upload')         readyToUpload++
       if (asset.status === 'Needs Refresh / Missing') needsRefresh++
       if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
-      const tier = getFreshnessTier(asset)
-      if (tier) {
-        freshness[tier]++
-        if (tier === 'stale' || tier === 'expired') staleCount++
-      }
+      // Health chips reflect the analyzer's performance verdict (live, scored assets only).
+      const state = asset.freshness_state as FreshnessState | null
+      if (state && state in freshness) freshness[state]++
       if (asset.content_type) contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
     }
 
-    return { client, totalAssets: clientAssets.length, freshness, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, staleCount }
+    return { client, totalAssets: clientAssets.length, freshness, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, needsReplacing: freshness.needs_replacing }
   })
 }
 
@@ -213,8 +191,8 @@ export default async function DashboardPage() {
     .map(s => ({ client: s.client, count: s.readyToUpload,  statusParam: 'Ready to Upload'         }))
   const pendingItems = summaries.filter(s => s.pendingReview > 0)
     .map(s => ({ client: s.client, count: s.pendingReview,  statusParam: 'Pending Review'           }))
-  const refreshItems = summaries.filter(s => s.needsRefresh > 0 || s.staleCount > 0)
-    .map(s => ({ client: s.client, count: s.needsRefresh + s.staleCount, statusParam: 'Needs Refresh / Missing' }))
+  const refreshItems = summaries.filter(s => s.needsRefresh > 0 || s.needsReplacing > 0)
+    .map(s => ({ client: s.client, count: s.needsRefresh + s.needsReplacing, statusParam: 'Needs Refresh / Missing' }))
 
   const totalUpload  = uploadItems.reduce((n, i) => n + i.count, 0)
   const totalPending = pendingItems.reduce((n, i) => n + i.count, 0)
@@ -304,8 +282,8 @@ export default async function DashboardPage() {
                     {totalAssets} asset{totalAssets !== 1 ? 's' : ''}
                   </p>
                 </div>
-                {/* Freshness summary dot */}
-                {(freshness.stale > 0 || freshness.expired > 0) && (
+                {/* Needs-replacing alert dot (performance verdict) */}
+                {freshness.needs_replacing > 0 && (
                   <span className="w-2 h-2 rounded-full bg-red-400 mt-1 flex-shrink-0" />
                 )}
               </div>
@@ -335,14 +313,13 @@ export default async function DashboardPage() {
                 </div>
               )}
 
-              {/* Library freshness */}
+              {/* Live performance health (analyzer verdict) */}
               {activeTiers.length > 0 && (
                 <div className="px-4 pt-3 pb-3">
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {activeTiers.map(tier => (
-                      <span key={tier.key} className={`flex items-center gap-1 text-xs ${tier.text}`}>
-                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${tier.dot}`} />
-                        {freshness[tier.key]} {tier.label}
+                      <span key={tier.key} className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 border ${tier.cls}`}>
+                        {tier.emoji} {freshness[tier.key]} {tier.label}
                       </span>
                     ))}
                   </div>
@@ -364,16 +341,15 @@ export default async function DashboardPage() {
 
       {/* ── Freshness legend ── */}
       <div className="mt-10 border-t border-stone-300 pt-6">
-        <SectionOpener label="Freshness Key" />
+        <SectionOpener label="Performance Key" />
         <div className="flex flex-wrap gap-2">
           {FRESHNESS_TIERS.map(tier => (
-            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs bg-white border border-stone-200 ${tier.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${tier.dot}`} />
-              {tier.label} — {
-                tier.key === 'fresh'       ? '0–7 days'   :
-                tier.key === 'monitor'     ? '8–14 days'  :
-                tier.key === 'refreshSoon' ? '15–21 days' :
-                tier.key === 'stale'       ? '22–30 days' : '31+ days'
+            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border ${tier.cls}`}>
+              {tier.emoji} {tier.label} — {
+                tier.key === 'still_performing' ? 'good stage metrics for the spend'     :
+                tier.key === 'underperforming'  ? 'tested but middling — watch it'        :
+                tier.key === 'needs_replacing'  ? 'tested and clearly poor — swap it out' :
+                                                  'not enough spend/signal yet to judge'
               }
             </div>
           ))}

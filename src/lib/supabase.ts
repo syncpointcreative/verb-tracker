@@ -48,6 +48,7 @@ export interface Asset {
   performance: 'High Performer' | 'Average Performer' | 'Poor Performer' | null
   freshness_state: string | null   // analyzer-written: still_performing | underperforming | needs_replacing | under_delivered
   freshness_detail: string | null  // human-readable "why" behind the state
+  freshness_reason: string | null  // set when needs_replacing: faded | never_performed
   freshness_scored_at: string | null
   created_at: string
   updated_at: string
