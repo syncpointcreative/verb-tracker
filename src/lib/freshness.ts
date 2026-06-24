@@ -49,6 +49,30 @@ export const FRESHNESS_META: Record<FreshnessState, { emoji: string; label: stri
   under_delivered:  { emoji: '⏳', label: 'Under-delivered',  cls: 'text-stone-600 bg-stone-100 border-stone-200' },
 }
 
+/** Display order for state breakdowns — most-actionable first. */
+export const FRESHNESS_STATE_ORDER: FreshnessState[] =
+  ['needs_replacing', 'underperforming', 'still_performing', 'under_delivered']
+
 export function freshnessMeta(state: string | null | undefined) {
   return state ? FRESHNESS_META[state as FreshnessState] ?? null : null
+}
+
+export function isNeedsReplacing(state: string | null | undefined): boolean {
+  return state === 'needs_replacing'
+}
+
+/**
+ * Replacement reason, written by the analyzer alongside a needs_replacing state.
+ * Splits "earned its retirement" (performed, then faded) from "never worked"
+ * (dud from the start) so the creative team knows whether to remix or move on.
+ */
+export type FreshnessReason = 'faded' | 'never_performed'
+
+export const FRESHNESS_REASON_META: Record<FreshnessReason, { emoji: string; label: string; cls: string; hint: string }> = {
+  faded:           { emoji: '📉', label: 'Faded',           cls: 'text-orange-700 bg-orange-50 border-orange-200',  hint: 'Performed early, then declined with age — worth a fresh variant of the concept.' },
+  never_performed: { emoji: '💀', label: 'Never performed', cls: 'text-stone-600 bg-stone-100 border-stone-300',    hint: "Underperformed from the start — don't repeat this concept/hook." },
+}
+
+export function freshnessReasonMeta(reason: string | null | undefined) {
+  return reason ? FRESHNESS_REASON_META[reason as FreshnessReason] ?? null : null
 }

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive, tierForDays } from '@/lib/freshness'
+import { daysLive, freshnessMeta, freshnessReasonMeta, isNeedsReplacing } from '@/lib/freshness'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
@@ -20,14 +20,12 @@ interface PendingChange {
 // Statuses shown in the main stage tables (active assets)
 const ACTIVE_STATUSES: AssetStatus[] = ['Ready to Upload', 'Live / Running', 'Paused', 'Needs Refresh / Missing', 'Expired']
 
-// Pseudo-status for the Stale quick-filter (Stale is a freshness tier, not a status)
-const STALE_FILTER = '__stale__'
+// Pseudo-status for the Needs-Replacing quick-filter (it's a freshness verdict, not a status)
+const STALE_FILTER = '__needs_replacing__'
 
-/** A live asset whose freshness tier is "Stale" (22–30 days live). */
+/** A live asset the analyzer flagged "needs replacing" (performance verdict, not age). */
 function isStaleRow(a: Asset): boolean {
-  if (!a.date_live) return false
-  if (['Pending Review', 'Pulled', 'Removed by Request', 'Paused'].includes(a.status)) return false
-  return tierForDays(daysLive(a.date_live)) === 'stale'
+  return isNeedsReplacing(a.freshness_state)
 }
 
 // Valid next-state transitions per current status
@@ -97,15 +95,17 @@ const STAGE_STYLE: Record<Stage, {
 
 // ─── Freshness meter ──────────────────────────────────────────────────────────
 
+// Age-tier fallback, used only for live assets the analyzer hasn't scored yet.
+// These are age notes, NOT verdicts — "Needs Replacing" comes only from the analyzer.
 const FRESHNESS = [
   { maxDays: 7,        label: 'Fresh',        bar: 'bg-emerald-400', text: 'text-emerald-700', track: 'bg-emerald-100' },
   { maxDays: 14,       label: 'Monitor',      bar: 'bg-yellow-400',  text: 'text-yellow-700',  track: 'bg-yellow-100'  },
   { maxDays: 21,       label: 'Refresh Soon', bar: 'bg-orange-400',  text: 'text-orange-700',  track: 'bg-orange-100'  },
-  { maxDays: 30,       label: 'Stale',        bar: 'bg-red-400',     text: 'text-red-700',     track: 'bg-red-100'     },
-  { maxDays: Infinity, label: 'Expired',      bar: 'bg-stone-400',   text: 'text-stone-500',   track: 'bg-stone-100'   },
+  { maxDays: Infinity, label: 'Aging',        bar: 'bg-stone-400',   text: 'text-stone-500',   track: 'bg-stone-100'   },
 ]
 
-function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status: string }) {
+function FreshnessMeter({ asset }: { asset: Asset }) {
+  const { date_live: dateLive, status } = asset
   if (status === 'Pulled' || status === 'Removed by Request' || status === 'Pending Review') {
     return <span className="text-stone-300 text-xs">—</span>
   }
@@ -116,6 +116,24 @@ function FreshnessMeter({ dateLive, status }: { dateLive: string | null; status:
     return <span className="text-stone-300 text-xs">Not live</span>
   }
   const days = daysLive(dateLive)
+  // Performance verdict (from the analyzer) supersedes the age meter when present.
+  const meta = freshnessMeta(asset.freshness_state)
+  if (meta) {
+    const reason = isNeedsReplacing(asset.freshness_state) ? freshnessReasonMeta(asset.freshness_reason) : null
+    return (
+      <div className="flex flex-col gap-0.5 min-w-[80px]">
+        <span title={asset.freshness_detail ?? ''} className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-1.5 py-0.5 border w-fit ${meta.cls}`}>
+          {meta.emoji} {meta.label}
+        </span>
+        {reason && (
+          <span title={reason.hint} className={`inline-flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 border w-fit ${reason.cls}`}>
+            {reason.emoji} {reason.label}
+          </span>
+        )}
+        <span className="text-[9px] text-stone-300">{days}d live</span>
+      </div>
+    )
+  }
   const tier = FRESHNESS.find(t => days <= t.maxDays) ?? FRESHNESS[FRESHNESS.length - 1]
   const pct  = Math.min(100, Math.round((days / 30) * 100))
   return (
@@ -577,7 +595,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
 
         {/* Freshness */}
         <td className="px-3 py-2">
-          <FreshnessMeter dateLive={asset.date_live ?? null} status={asset.status} />
+          <FreshnessMeter asset={asset} />
           {asset.first_live && (
             <div className="text-[9px] text-stone-300 italic mt-0.5">
               First live {new Date(asset.first_live + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
@@ -653,7 +671,7 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-            {staleCount} Stale
+            🔴 {staleCount} Needs Replacing
           </button>
         )}
         {selectedStatus && (
