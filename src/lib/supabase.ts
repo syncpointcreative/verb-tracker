@@ -50,6 +50,9 @@ export interface Asset {
   freshness_detail: string | null  // human-readable "why" behind the state
   freshness_reason: string | null  // set when needs_replacing: faded | never_performed
   freshness_scored_at: string | null
+  tiktok_campaign: string | null   // analyzer-matched: campaign name(s) this asset runs in on TikTok
+  tiktok_adgroup: string | null    // analyzer-matched: ad-group name(s) this asset runs in
+  tiktok_synced_at: string | null
   created_at: string
   updated_at: string
   // joined
