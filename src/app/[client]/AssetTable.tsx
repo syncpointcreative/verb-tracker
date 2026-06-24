@@ -565,6 +565,14 @@ export default function AssetTable({ assets, products, onStatusChange: notifyPar
           ) : (
             <div className="text-xs text-stone-400 mt-0.5">{asset.content_type ?? '—'}</div>
           )}
+          {!editMode && asset.tiktok_campaign && (
+            <div
+              className="text-[10px] text-stone-400 mt-0.5 truncate max-w-[260px]"
+              title={`Live on TikTok\nCampaign: ${asset.tiktok_campaign}${asset.tiktok_adgroup ? `\nAd group: ${asset.tiktok_adgroup}` : ''}`}
+            >
+              📍 {asset.tiktok_campaign}
+            </div>
+          )}
         </td>
 
         {/* Status */}

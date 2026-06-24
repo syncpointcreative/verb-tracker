@@ -173,6 +173,30 @@ export function AssetPreviewModal({
           )}
         </div>
 
+        {/* TikTok location — where this asset actually runs (analyzer back-match) */}
+        {(asset.tiktok_campaign || asset.tiktok_adgroup) && (
+          <div className="px-5 py-3 border-t border-stone-100 bg-white flex-shrink-0">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.12em] mb-1.5">📍 Live on TikTok</p>
+            {asset.tiktok_campaign && (
+              <div className="flex gap-2 text-xs mb-1">
+                <span className="text-stone-400 w-20 flex-shrink-0">Campaign</span>
+                <span className="text-stone-700 break-words">{asset.tiktok_campaign}</span>
+              </div>
+            )}
+            {asset.tiktok_adgroup && (
+              <div className="flex gap-2 text-xs">
+                <span className="text-stone-400 w-20 flex-shrink-0">Ad group</span>
+                <span className="text-stone-700 break-words">{asset.tiktok_adgroup}</span>
+              </div>
+            )}
+            {asset.tiktok_synced_at && (
+              <p className="text-[10px] text-stone-300 mt-1.5">
+                Matched {new Date(asset.tiktok_synced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-5 py-3 border-t border-stone-100 bg-stone-50 flex items-center gap-3 flex-wrap flex-shrink-0">
           {/* Asset meta pills */}
