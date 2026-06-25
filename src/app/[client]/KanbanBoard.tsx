@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { Asset, Product } from '@/lib/supabase'
 import type { Stage, AssetStatus } from '@/lib/supabase'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive, freshnessMeta, freshnessReasonMeta, isNeedsReplacing } from '@/lib/freshness'
+import { daysLive, freshnessVerdict, isNeedsReplacing } from '@/lib/freshness'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
 interface Campaign { id: string; name: string; tiktok_campaign_id?: string | null }
@@ -37,20 +37,12 @@ function FreshnessPill({ asset }: { asset: Asset }) {
     <span className="text-[10px] tracking-wide text-sky-600 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5">⏸ Paused</span>
   )
   // Performance-based state (from the analyzer) supersedes the age tier when present.
-  const meta = freshnessMeta(asset.freshness_state)
-  if (meta) {
-    // For "needs replacing", the analyzer also tags WHY — faded vs never-performed.
-    const reason = isNeedsReplacing(asset.freshness_state) ? freshnessReasonMeta(asset.freshness_reason) : null
+  // For "needs replacing" the pill IS the action: 📉 Replace (faded) vs 💀 Kill (dud).
+  const verdict = freshnessVerdict(asset.freshness_state, asset.freshness_reason)
+  if (verdict) {
     return (
-      <span className="inline-flex items-center gap-1 flex-wrap">
-        <span title={asset.freshness_detail ?? ''} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${meta.cls}`}>
-          {meta.emoji} {meta.label}
-        </span>
-        {reason && (
-          <span title={reason.hint} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${reason.cls}`}>
-            {reason.emoji} {reason.label}
-          </span>
-        )}
+      <span title={verdict.hint ?? asset.freshness_detail ?? ''} className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 border ${verdict.cls}`}>
+        {verdict.emoji} {verdict.label}
       </span>
     )
   }

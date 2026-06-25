@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { STAGES, STATUS_CONFIG } from '@/lib/constants'
-import { daysLive, freshnessMeta, freshnessReasonMeta, isNeedsReplacing } from '@/lib/freshness'
+import { daysLive, freshnessVerdict, isNeedsReplacing } from '@/lib/freshness'
 import type { Asset, AssetStatus, Product, Stage } from '@/lib/supabase'
 import { AssetPreviewModal } from '@/components/AssetPreviewModal'
 
@@ -117,19 +117,14 @@ function FreshnessMeter({ asset }: { asset: Asset }) {
   }
   const days = daysLive(dateLive)
   // Performance verdict (from the analyzer) supersedes the age meter when present.
-  const meta = freshnessMeta(asset.freshness_state)
-  if (meta) {
-    const reason = isNeedsReplacing(asset.freshness_state) ? freshnessReasonMeta(asset.freshness_reason) : null
+  // For "needs replacing" the pill IS the action: 📉 Replace (faded) vs 💀 Kill (dud).
+  const verdict = freshnessVerdict(asset.freshness_state, asset.freshness_reason)
+  if (verdict) {
     return (
       <div className="flex flex-col gap-0.5 min-w-[80px]">
-        <span title={asset.freshness_detail ?? ''} className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-1.5 py-0.5 border w-fit ${meta.cls}`}>
-          {meta.emoji} {meta.label}
+        <span title={verdict.hint ?? asset.freshness_detail ?? ''} className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-1.5 py-0.5 border w-fit ${verdict.cls}`}>
+          {verdict.emoji} {verdict.label}
         </span>
-        {reason && (
-          <span title={reason.hint} className={`inline-flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 border w-fit ${reason.cls}`}>
-            {reason.emoji} {reason.label}
-          </span>
-        )}
         <span className="text-[9px] text-stone-300">{days}d live</span>
       </div>
     )
