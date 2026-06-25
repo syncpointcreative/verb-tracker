@@ -76,3 +76,66 @@ export const FRESHNESS_REASON_META: Record<FreshnessReason, { emoji: string; lab
 export function freshnessReasonMeta(reason: string | null | undefined) {
   return reason ? FRESHNESS_REASON_META[reason as FreshnessReason] ?? null : null
 }
+
+/**
+ * The actionable split of "needs replacing". The reason (faded vs never-performed)
+ * is a diagnosis; this turns it into the PLAY the creative team runs, and the red
+ * pill itself becomes that action instead of a generic "Needs replacing":
+ *   • faded            → 📉 Replace — make a fresh variant (the concept worked)
+ *   • never_performed  → 💀 Kill — don't repeat the concept/hook
+ * `label` is the short chip word; `action` is the full pill text.
+ */
+export type ReplaceAction = 'replace' | 'kill'
+
+export const REPLACE_ACTION_META: Record<ReplaceAction, { emoji: string; label: string; action: string; cls: string; hint: string }> = {
+  replace: { emoji: '📉', label: 'Replace', action: 'Replace — fresh variant', cls: 'text-orange-700 bg-orange-50 border-orange-200', hint: 'Performed early, then faded with age — make a fresh variant of the concept.' },
+  kill:    { emoji: '💀', label: 'Kill',    action: "Kill — don't repeat",     cls: 'text-red-700 bg-red-50 border-red-200',        hint: "Never performed from the start — don't repeat this concept/hook." },
+}
+
+export function replaceActionFor(reason: string | null | undefined): ReplaceAction {
+  return reason === 'faded' ? 'replace' : 'kill'
+}
+
+/**
+ * The single pill verdict shown on a card/row. For needs_replacing (with a reason),
+ * the pill becomes the action (Replace/Kill); every other state passes through its
+ * own meta unchanged. Returns null when the asset has no analyzer verdict yet.
+ */
+export function freshnessVerdict(state: string | null | undefined, reason: string | null | undefined):
+  { emoji: string; label: string; cls: string; hint?: string } | null {
+  const meta = freshnessMeta(state)
+  if (!meta) return null
+  if (isNeedsReplacing(state) && reason) {
+    const a = REPLACE_ACTION_META[replaceActionFor(reason)]
+    return { emoji: a.emoji, label: a.action, cls: a.cls, hint: a.hint }
+  }
+  return { emoji: meta.emoji, label: meta.label, cls: meta.cls }
+}
+
+/** Dashboard verdict chip (count + label), in actionable order. */
+export type VerdictChip = { key: string; emoji: string; label: string; cls: string; count: number }
+
+/**
+ * Dashboard health chips in most-actionable order, with needs_replacing split into
+ * Replace (faded) and Kill (never-performed) so the card counts mirror the board.
+ * `faded`/`kill` are the reason-split sub-counts of `needs_replacing`.
+ */
+export function verdictChips(counts: FreshnessCounts & { faded?: number; kill?: number }): VerdictChip[] {
+  const chips: VerdictChip[] = []
+  for (const key of FRESHNESS_STATE_ORDER) {
+    if (key === 'needs_replacing') {
+      const faded = counts.faded ?? 0, kill = counts.kill ?? 0
+      if (faded) chips.push({ key: 'replace', count: faded, emoji: REPLACE_ACTION_META.replace.emoji, label: REPLACE_ACTION_META.replace.label, cls: REPLACE_ACTION_META.replace.cls })
+      if (kill)  chips.push({ key: 'kill',    count: kill,  emoji: REPLACE_ACTION_META.kill.emoji,    label: REPLACE_ACTION_META.kill.label,    cls: REPLACE_ACTION_META.kill.cls })
+      // any needs_replacing the analyzer hasn't reason-tagged yet still surfaces
+      const untagged = counts.needs_replacing - faded - kill
+      if (untagged > 0) chips.push({ key: 'needs_replacing', count: untagged, emoji: FRESHNESS_META.needs_replacing.emoji, label: FRESHNESS_META.needs_replacing.label, cls: FRESHNESS_META.needs_replacing.cls })
+    } else if (counts[key] > 0) {
+      chips.push({ key, count: counts[key], emoji: FRESHNESS_META[key].emoji, label: FRESHNESS_META[key].label, cls: FRESHNESS_META[key].cls })
+    }
+  }
+  return chips
+}
+
+/** Counts of each performance verdict for a set of assets. */
+export type FreshnessCounts = Record<FreshnessState, number>

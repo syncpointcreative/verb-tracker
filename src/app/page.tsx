@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase'
-import { FRESHNESS_META, FRESHNESS_STATE_ORDER, type FreshnessState } from '@/lib/freshness'
+import { FRESHNESS_META, REPLACE_ACTION_META, verdictChips, type FreshnessState } from '@/lib/freshness'
 import type { Client, Asset } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,6 +19,8 @@ interface ClientSummary {
   client: Client
   totalAssets: number
   freshness: FreshnessCounts
+  faded: number
+  kill: number
   contentTypeCounts: Record<string, number>
   deliveries: MonthlyDelivery[]
   currentStart: string
@@ -32,9 +34,15 @@ interface ClientSummary {
 
 // ─── Freshness helpers ────────────────────────────────────────────────────────
 
-// Dashboard health chips read the analyzer verdict (freshness_state), in
-// most-actionable-first order. Age is no longer a verdict on this page.
-const FRESHNESS_TIERS = FRESHNESS_STATE_ORDER.map(key => ({ key, ...FRESHNESS_META[key] }))
+// Performance-key legend, most-actionable first. "Needs replacing" is split into
+// its two plays — Replace (faded) vs Kill (never-performed) — to match the board.
+const LEGEND: { emoji: string; label: string; cls: string; desc: string }[] = [
+  { emoji: REPLACE_ACTION_META.replace.emoji, label: REPLACE_ACTION_META.replace.action, cls: REPLACE_ACTION_META.replace.cls, desc: 'performed, then faded — make a fresh variant' },
+  { emoji: REPLACE_ACTION_META.kill.emoji,    label: REPLACE_ACTION_META.kill.action,    cls: REPLACE_ACTION_META.kill.cls,    desc: "never performed — don't repeat the concept/hook" },
+  { emoji: FRESHNESS_META.underperforming.emoji,  label: FRESHNESS_META.underperforming.label,  cls: FRESHNESS_META.underperforming.cls,  desc: 'tested but middling — watch it' },
+  { emoji: FRESHNESS_META.still_performing.emoji, label: FRESHNESS_META.still_performing.label, cls: FRESHNESS_META.still_performing.cls, desc: 'good stage metrics for the spend' },
+  { emoji: FRESHNESS_META.under_delivered.emoji,  label: FRESHNESS_META.under_delivered.label,  cls: FRESHNESS_META.under_delivered.cls,  desc: 'not enough spend/signal yet to judge' },
+]
 
 // ─── Billing period helpers ───────────────────────────────────────────────────
 
@@ -90,14 +98,14 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   }
 
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
-    supabase.from('assets').select('client_id, date_added, date_live, status, content_type, freshness_state')
+    supabase.from('assets').select('client_id, date_added, date_live, status, content_type, freshness_state, freshness_reason')
       .in('client_id', clients.map(c => c.id)),
     supabase.from('monthly_deliveries').select('*')
       .in('client_id', clients.map(c => c.id))
       .in('month', Array.from(allPeriodStarts)).order('month'),
   ])
 
-  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type' | 'freshness_state'>[]> = {}
+  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type' | 'freshness_state' | 'freshness_reason'>[]> = {}
   for (const a of (assets ?? [])) {
     if (!assetsByClient[a.client_id]) assetsByClient[a.client_id] = []
     assetsByClient[a.client_id].push(a)
@@ -115,6 +123,8 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
     const freshness: FreshnessCounts = { still_performing: 0, underperforming: 0, needs_replacing: 0, under_delivered: 0 }
     const contentTypeCounts: Record<string, number> = {}
     let pendingReview = 0, readyToUpload = 0, needsRefresh = 0
+    // needs_replacing splits by reason into its two plays (📉 Replace vs 💀 Kill).
+    let faded = 0, kill = 0
 
     for (const asset of clientAssets) {
       if (asset.status === 'Pending Review')          pendingReview++
@@ -124,10 +134,11 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
       // Health chips reflect the analyzer's performance verdict (live, scored assets only).
       const state = asset.freshness_state as FreshnessState | null
       if (state && state in freshness) freshness[state]++
+      if (state === 'needs_replacing') { if (asset.freshness_reason === 'faded') faded++; else kill++ }
       if (asset.content_type) contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
     }
 
-    return { client, totalAssets: clientAssets.length, freshness, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, needsReplacing: freshness.needs_replacing }
+    return { client, totalAssets: clientAssets.length, freshness, faded, kill, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, needsReplacing: freshness.needs_replacing }
   })
 }
 
@@ -258,11 +269,11 @@ export default async function DashboardPage() {
         <SectionOpener label={`${summaries.length} Clients`} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {summaries.map(({ client, totalAssets, freshness, contentTypeCounts, deliveries, currentStart, nextStart, billingDay }) => {
+        {summaries.map(({ client, totalAssets, freshness, faded, kill, contentTypeCounts, deliveries, currentStart, nextStart, billingDay }) => {
           const currentDelivery = deliveries.find(d => d.month === currentStart)
           const nextDelivery    = deliveries.find(d => d.month === nextStart)
           const isMaxed = currentDelivery ? currentDelivery.delivered >= currentDelivery.quota : false
-          const activeTiers = FRESHNESS_TIERS.filter(t => freshness[t.key] > 0)
+          const activeTiers = verdictChips({ ...freshness, faded, kill })
           const sortedTypes = Object.entries(contentTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4)
 
           return (
@@ -319,7 +330,7 @@ export default async function DashboardPage() {
                   <div className="flex flex-wrap gap-1.5">
                     {activeTiers.map(tier => (
                       <span key={tier.key} className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 border ${tier.cls}`}>
-                        {tier.emoji} {freshness[tier.key]} {tier.label}
+                        {tier.emoji} {tier.count} {tier.label}
                       </span>
                     ))}
                   </div>
@@ -343,14 +354,9 @@ export default async function DashboardPage() {
       <div className="mt-10 border-t border-stone-300 pt-6">
         <SectionOpener label="Performance Key" />
         <div className="flex flex-wrap gap-2">
-          {FRESHNESS_TIERS.map(tier => (
-            <div key={tier.key} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border ${tier.cls}`}>
-              {tier.emoji} {tier.label} — {
-                tier.key === 'still_performing' ? 'good stage metrics for the spend'     :
-                tier.key === 'underperforming'  ? 'tested but middling — watch it'        :
-                tier.key === 'needs_replacing'  ? 'tested and clearly poor — swap it out' :
-                                                  'not enough spend/signal yet to judge'
-              }
+          {LEGEND.map(tier => (
+            <div key={tier.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border ${tier.cls}`}>
+              {tier.emoji} {tier.label} — {tier.desc}
             </div>
           ))}
         </div>
