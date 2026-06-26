@@ -71,7 +71,7 @@ function b64url(input: string | Buffer): string {
   return b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-async function getGoogleToken(): Promise<string> {
+export async function getGoogleToken(): Promise<string> {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set')
 
