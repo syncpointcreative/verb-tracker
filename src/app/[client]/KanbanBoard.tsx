@@ -726,8 +726,10 @@ function FilterBar({
 export default function KanbanBoard({ assets: initialAssets, campaigns: initialCampaigns, clientId, initialStatus, onStatusChange: notifyParent }: Props) {
   const [localAssets, setLocalAssets]       = useState<Asset[]>(initialAssets)
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>(initialCampaigns)
-  const [statusFilter, setStatusFilter]     = useState<string | null>(initialStatus ?? null)
-  const [campaignFilter, setCampaignFilter] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter]               = useState<string | null>(initialStatus ?? null)
+  const [campaignFilter, setCampaignFilter]           = useState<string | null>(null)
+  const [tiktokCampaignFilter, setTiktokCampaignFilter] = useState<string | null>(null)
+  const [tiktokAdgroupFilter, setTiktokAdgroupFilter]   = useState<string | null>(null)
   const [mobileStage, setMobileStage]       = useState<Stage>('Awareness')
   const [pullTarget, setPullTarget]         = useState<Asset | null>(null)
   const [approvalTarget, setApprovalTarget] = useState<Asset | null>(null)
@@ -939,6 +941,25 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
 
   const staleCount = useMemo(() => localAssets.filter(isStale).length, [localAssets])
 
+  // Parse the " · "-delimited strings the scorer writes for tiktok_campaign / tiktok_adgroup.
+  function splitTT(val: string | null | undefined): string[] {
+    return val ? val.split(' · ').map(s => s.trim()).filter(Boolean) : []
+  }
+
+  // Unique live TikTok campaign names across all assets (for the filter dropdown).
+  const tiktokCampaigns = useMemo(() =>
+    [...new Set(localAssets.flatMap(a => splitTT(a.tiktok_campaign)))].sort()
+  , [localAssets])
+
+  // Unique ad-group names — scoped to the active campaign filter so the second
+  // dropdown only shows ad groups that belong to the selected campaign.
+  const tiktokAdgroups = useMemo(() => {
+    const source = tiktokCampaignFilter
+      ? localAssets.filter(a => splitTT(a.tiktok_campaign).includes(tiktokCampaignFilter))
+      : localAssets
+    return [...new Set(source.flatMap(a => splitTT(a.tiktok_adgroup)))].sort()
+  }, [localAssets, tiktokCampaignFilter])
+
   const byStage = useMemo(() => {
     let filtered = statusFilter === STALE_FILTER
       ? localAssets.filter(isStale)
@@ -948,12 +969,18 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     if (campaignFilter) {
       filtered = filtered.filter(a => (a.campaigns ?? []).includes(campaignFilter))
     }
+    if (tiktokCampaignFilter) {
+      filtered = filtered.filter(a => splitTT(a.tiktok_campaign).includes(tiktokCampaignFilter))
+    }
+    if (tiktokAdgroupFilter) {
+      filtered = filtered.filter(a => splitTT(a.tiktok_adgroup).includes(tiktokAdgroupFilter))
+    }
     const grouped: Record<Stage, Asset[]> = { Awareness: [], Consideration: [], Conversion: [], 'Community Interaction': [] }
     for (const a of filtered) {
       if (a.stage in grouped) grouped[a.stage as Stage].push(a)
     }
     return grouped
-  }, [localAssets, statusFilter, campaignFilter])
+  }, [localAssets, statusFilter, campaignFilter, tiktokCampaignFilter, tiktokAdgroupFilter])
 
   const totalFiltered = Object.values(byStage).reduce((n, arr) => n + arr.length, 0)
 
@@ -1033,7 +1060,49 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
             )}
           </div>
         )}
-        {(statusFilter || campaignFilter) && totalFiltered === 0 && (
+        {/* TikTok campaign / ad-group filters — drive off scorer-synced live placement data */}
+        {tiktokCampaigns.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-stone-400 tracking-wide whitespace-nowrap">Live Campaign:</span>
+              <select
+                value={tiktokCampaignFilter ?? ''}
+                onChange={e => {
+                  setTiktokCampaignFilter(e.target.value || null)
+                  setTiktokAdgroupFilter(null)
+                }}
+                className="text-[11px] px-2 py-1 rounded-lg border border-stone-200 bg-white text-stone-600 focus:outline-none focus:border-indigo-300 max-w-[260px]"
+              >
+                <option value="">All campaigns</option>
+                {tiktokCampaigns.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {tiktokCampaignFilter && (
+                <button onClick={() => { setTiktokCampaignFilter(null); setTiktokAdgroupFilter(null) }} className="text-[10px] text-stone-300 hover:text-stone-500 transition-colors">✕</button>
+              )}
+            </div>
+            {tiktokAdgroups.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-stone-400 tracking-wide whitespace-nowrap">Ad Group:</span>
+                <select
+                  value={tiktokAdgroupFilter ?? ''}
+                  onChange={e => setTiktokAdgroupFilter(e.target.value || null)}
+                  className="text-[11px] px-2 py-1 rounded-lg border border-stone-200 bg-white text-stone-600 focus:outline-none focus:border-indigo-300 max-w-[220px]"
+                >
+                  <option value="">All ad groups</option>
+                  {tiktokAdgroups.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+                {tiktokAdgroupFilter && (
+                  <button onClick={() => setTiktokAdgroupFilter(null)} className="text-[10px] text-stone-300 hover:text-stone-500 transition-colors">✕</button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {(statusFilter || campaignFilter || tiktokCampaignFilter || tiktokAdgroupFilter) && totalFiltered === 0 && (
           <p className="text-xs text-stone-400">No assets match this filter.</p>
         )}
       </div>
