@@ -61,7 +61,16 @@ async function downloadFromSlack(slackUrl: string): Promise<Buffer> {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(`Slack download failed: ${res.status} ${res.statusText}`)
-  return Buffer.from(await res.arrayBuffer())
+  const buf = Buffer.from(await res.arrayBuffer())
+  // Slack serves an HTML auth/redirect page with HTTP 200 (not a 404) for expired
+  // or unauthorized url_private_download links. Without this guard that ~60KB HTML
+  // gets uploaded as the "video". Treat it as a refreshable failure.
+  const ct   = (res.headers.get('content-type') || '').toLowerCase()
+  const head = buf.subarray(0, 32).toString('utf8').trim().toLowerCase()
+  if (ct.includes('text/html') || head.startsWith('<!doctype') || head.startsWith('<html')) {
+    throw new Error('Slack returned HTML not file bytes (expired/unauthorized url_private_download)')
+  }
+  return buf
 }
 
 // ─── Google Drive ─────────────────────────────────────────────────────────────

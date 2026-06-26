@@ -92,12 +92,13 @@ export async function GET(req: NextRequest) {
           clientName: item.client_name,
         })
       } catch (firstErr) {
-        // If Slack returned 404 the stored URL has expired — try to refresh it
-        if (!String(firstErr).includes('404')) throw firstErr
+        // Refresh the stored URL when it's expired: Slack signals this either as a
+        // 404 OR as an HTTP-200 HTML auth page (caught in downloadFromSlack).
+        if (!/404|returned HTML/i.test(String(firstErr))) throw firstErr
 
-        console.warn(`[drive-sync] 404 on ${item.file_name} — refreshing Slack URL...`)
+        console.warn(`[drive-sync] stale/HTML URL on ${item.file_name} — refreshing Slack URL...`)
         const freshUrl = await getFreshSlackUrl(item.slack_file_id, item.file_name, supabase)
-        if (!freshUrl) throw new Error(`Slack download failed: 404 and could not refresh URL`)
+        if (!freshUrl) throw new Error(`Slack download failed: stale URL and could not refresh`)
 
         // Persist the fresh URL so future retries don't need to refresh again
         slackUrl = freshUrl
