@@ -66,11 +66,12 @@ export function isNeedsReplacing(state: string | null | undefined): boolean {
  * Splits "earned its retirement" (performed, then faded) from "never worked"
  * (dud from the start) so the creative team knows whether to remix or move on.
  */
-export type FreshnessReason = 'faded' | 'never_performed'
+export type FreshnessReason = 'faded' | 'never_performed' | 'aged_out'
 
 export const FRESHNESS_REASON_META: Record<FreshnessReason, { emoji: string; label: string; cls: string; hint: string }> = {
   faded:           { emoji: '📉', label: 'Faded',           cls: 'text-orange-700 bg-orange-50 border-orange-200',  hint: 'Performed early, then declined with age — worth a fresh variant of the concept.' },
   never_performed: { emoji: '💀', label: 'Never performed', cls: 'text-stone-600 bg-stone-100 border-stone-300',    hint: "Underperformed from the start — don't repeat this concept/hook." },
+  aged_out:        { emoji: '📅', label: 'Aged out',        cls: 'text-amber-700 bg-amber-50 border-amber-200',     hint: 'Has run for 90+ days — retire this creative and launch a fresh variant.' },
 }
 
 export function freshnessReasonMeta(reason: string | null | undefined) {
@@ -93,7 +94,7 @@ export const REPLACE_ACTION_META: Record<ReplaceAction, { emoji: string; label: 
 }
 
 export function replaceActionFor(reason: string | null | undefined): ReplaceAction {
-  return reason === 'faded' ? 'replace' : 'kill'
+  return (reason === 'faded' || reason === 'aged_out') ? 'replace' : 'kill'
 }
 
 /**
