@@ -11,7 +11,7 @@ export default async function Sidebar() {
 
   const { data: assets } = await supabase
     .from('assets')
-    .select('client_id, status, date_live, date_added')
+    .select('client_id, status, freshness_state')
     .in('client_id', (clients ?? []).map(c => c.id))
     .not('status', 'in', '("Pulled","Removed by Request")')
 
@@ -32,16 +32,9 @@ export default async function Sidebar() {
       if (asset.status === 'Expired') { hasRed = true; break }
       if (asset.status === 'Needs Refresh / Missing') { hasAmber = true; continue }
       if (asset.status === 'Pending Review') { hasAmber = true; continue }
-      // Paused is intentional — don't penalise health dot for it
-      if (asset.status === 'Paused') { continue }
 
-      // Check freshness for live/ready assets (only date_live counts)
-      if (asset.date_live) {
-        const days = Math.floor(
-          (Date.now() - new Date(asset.date_live + 'T12:00:00').getTime()) / 86_400_000
-        )
-        if (days > 21) hasRed = true
-      }
+      if (asset.freshness_state === 'needs_replacing') { hasRed = true }
+      else if (asset.freshness_state === 'underperforming') { hasAmber = true }
     }
 
     healthByClient[client.id] = hasRed ? 'red' : hasAmber ? 'amber' : 'green'
