@@ -114,7 +114,30 @@ async function runMondayAlert(
     return NextResponse.json({ ok: true, run: 'monday', alerted: 0, message: 'Nothing in Refresh Soon range' })
   }
 
-  // Group by client
+  // Parallel: fetch Ready-to-Upload assets (replacement already queued) and all live
+  // assets with tiktok_adgroup (for per-ad-group deck coverage analysis).
+  const [rtuResult, liveResult] = await Promise.all([
+    supabase.from('assets').select('client_id, product_id, stage').eq('status', 'Ready to Upload'),
+    supabase.from('assets').select('client_id, tiktok_adgroup').eq('status', 'Live / Running').not('tiktok_adgroup', 'is', null),
+  ])
+
+  // client_id:product_id:stage combos that already have a replacement queued
+  const coveredByRTU = new Set(
+    (rtuResult.data ?? []).map(a => `${a.client_id}:${a.product_id}:${a.stage}`)
+  )
+
+  // Per-client adgroup live-creative counts (from scorer-matched assets only)
+  const adgroupCounts = new Map<string, Map<string, number>>()
+  for (const a of (liveResult.data ?? [])) {
+    if (!a.tiktok_adgroup) continue
+    if (!adgroupCounts.has(a.client_id)) adgroupCounts.set(a.client_id, new Map())
+    const clientMap = adgroupCounts.get(a.client_id)!
+    for (const ag of a.tiktok_adgroup.split(' · ').map((s: string) => s.trim()).filter(Boolean)) {
+      clientMap.set(ag, (clientMap.get(ag) ?? 0) + 1)
+    }
+  }
+
+  // Group needs by client
   const byClient = new Map<string, typeof needsAlert>()
   for (const a of needsAlert) {
     if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
@@ -127,33 +150,78 @@ async function runMondayAlert(
     const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
     if (!client) continue
 
-    const count = clientAssets.length
+    const isCovered = (a: typeof clientAssets[0]) =>
+      coveredByRTU.has(`${a.client_id}:${a.product_id}:${a.stage}`)
+
+    const uncoveredCount = clientAssets.filter(a => !isCovered(a)).length
+    const coveredCount   = clientAssets.filter(a => isCovered(a)).length
+    const count          = clientAssets.length
+
     const sorted = [...clientAssets].sort((a, b) =>
       daysSince(getRelevantDate(b) ?? '') - daysSince(getRelevantDate(a) ?? '')
     )
 
-    // One section block per stage (avoids Slack's 3000-char section limit)
+    // One section block per stage. Covered assets (RTU replacement queued) get a ✅
+    // strikethrough; uncovered assets show the normal ask.
     const stageBlocks = STAGES.flatMap(stage => {
       const stageAssets = sorted.filter(a => a.stage === stage)
       if (!stageAssets.length) return []
 
-      const lines = stageAssets.map(a => {
-        const days    = daysSince(getRelevantDate(a) ?? '')
-        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
-        const type    = a.content_type ?? 'Unknown type'
-        return `    › ${product} — ${type} — *${days} days* live`
-      })
+      const needed  = stageAssets.filter(a => !isCovered(a))
+      const covered = stageAssets.filter(a => isCovered(a))
+
+      const lines: string[] = [
+        ...needed.map(a => {
+          const days    = daysSince(getRelevantDate(a) ?? '')
+          const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
+          const type    = a.content_type ?? 'Unknown type'
+          return `    › ${product} — ${type} — *${days} days* live`
+        }),
+        ...covered.map(a => {
+          const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
+          const type    = a.content_type ?? 'Unknown type'
+          return `    ✅ ~${product} — ${type}~ _(replacement in queue)_`
+        }),
+      ]
+
+      const askLine = needed.length > 0 ? `\n    _Ask: ${STAGE_SUGGESTION[stage] ?? ''}_` : ''
 
       return [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}\n    _Ask: ${STAGE_SUGGESTION[stage] ?? ''}_`,
+            text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}${askLine}`,
           },
         },
       ]
     })
+
+    // Ad group deck coverage — flag groups with < 3 live scorer-matched creatives
+    const clientAdgroups = adgroupCounts.get(client.id)
+    const thinAdgroups: { name: string; count: number }[] = []
+    if (clientAdgroups) {
+      for (const [ag, cnt] of clientAdgroups) {
+        if (cnt < 3) thinAdgroups.push({ name: ag, count: cnt })
+      }
+      thinAdgroups.sort((a, b) => a.count - b.count)
+    }
+
+    const coverageBlocks = thinAdgroups.length > 0 ? [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `💡 *Ad Group Coverage* _(thin groups — target 3+ live creatives)_\n${thinAdgroups.map(ag =>
+            `    ${ag.count === 1 ? '🚨' : '⚠️'} ${ag.name}: *${ag.count}* live`
+          ).join('\n')}`,
+        },
+      },
+    ] : []
+
+    const summaryParts = [`*${count} asset${count !== 1 ? 's' : ''}* hitting Refresh Soon (${REFRESH_SOON_DAYS}+ days live)`]
+    if (coveredCount > 0) summaryParts.push(`*${coveredCount}* replacement${coveredCount !== 1 ? 's' : ''} already in queue`)
+    if (uncoveredCount > 0) summaryParts.push(`*${uncoveredCount}* still need new creative`)
 
     const message = {
       channel: channelId,
@@ -165,12 +233,10 @@ async function runMondayAlert(
         },
         {
           type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*${count} asset${count !== 1 ? 's' : ''}* hitting Refresh Soon (${REFRESH_SOON_DAYS}+ days live). Get new creative in the pipeline this week.`,
-          },
+          text: { type: 'mrkdwn', text: summaryParts.join(' · ') },
         },
         ...stageBlocks,
+        ...coverageBlocks,
         { type: 'divider' },
         {
           type: 'actions',
@@ -190,13 +256,13 @@ async function runMondayAlert(
       continue
     }
 
-    // Stamp so Thursday knows this week's baseline
+    // Stamp all assets (covered + uncovered) so Thursday has the full week's baseline
     await supabase
       .from('assets')
       .update({ refresh_notified_at: new Date().toISOString() })
       .in('id', clientAssets.map(a => a.id))
 
-    totalAlerted += count
+    totalAlerted += uncoveredCount
   }
 
   return NextResponse.json({ ok: true, run: 'monday', alerted: totalAlerted })
