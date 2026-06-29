@@ -649,11 +649,16 @@ const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Expired',
 ]
 
-const STALE_FILTER = '__needs_replacing__'
+const STALE_FILTER          = '__needs_replacing__'
+const UNDERPERFORMING_FILTER = '__underperforming__'
 
 // Performance verdict from the analyzer — not an age cutoff.
 function isStale(asset: Asset): boolean {
   return isNeedsReplacing(asset.freshness_state)
+}
+
+function isUnderperforming(asset: Asset): boolean {
+  return asset.freshness_state === 'underperforming'
 }
 
 function FilterBar({
@@ -661,11 +666,13 @@ function FilterBar({
   onFilter,
   counts,
   staleCount,
+  underperformingCount,
 }: {
   activeFilter: string | null
   onFilter: (s: string | null) => void
   counts: Record<string, number>
   staleCount: number
+  underperformingCount: number
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -701,6 +708,22 @@ function FilterBar({
           </button>
         )
       })}
+      {underperformingCount > 0 && (
+        <button
+          onClick={() => onFilter(activeFilter === UNDERPERFORMING_FILTER ? null : UNDERPERFORMING_FILTER)}
+          className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+            activeFilter === UNDERPERFORMING_FILTER
+              ? 'bg-amber-100 text-amber-700 border-transparent'
+              : 'text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700 bg-white'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          🟡 Underperforming
+          <span className={`tabular-nums text-[10px] ${activeFilter === UNDERPERFORMING_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
+            {underperformingCount}
+          </span>
+        </button>
+      )}
       {staleCount > 0 && (
         <button
           onClick={() => onFilter(activeFilter === STALE_FILTER ? null : STALE_FILTER)}
@@ -939,7 +962,8 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     return counts
   }, [localAssets])
 
-  const staleCount = useMemo(() => localAssets.filter(isStale).length, [localAssets])
+  const staleCount          = useMemo(() => localAssets.filter(isStale).length, [localAssets])
+  const underperformingCount = useMemo(() => localAssets.filter(isUnderperforming).length, [localAssets])
 
   // Parse the " · "-delimited strings the scorer writes for tiktok_campaign / tiktok_adgroup.
   function splitTT(val: string | null | undefined): string[] {
@@ -963,7 +987,9 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
   const byStage = useMemo(() => {
     let filtered = statusFilter === STALE_FILTER
       ? localAssets.filter(isStale)
-      : statusFilter
+      : statusFilter === UNDERPERFORMING_FILTER
+        ? localAssets.filter(isUnderperforming)
+        : statusFilter
         ? localAssets.filter(a => a.status === statusFilter)
         : localAssets
     if (campaignFilter) {
@@ -1037,6 +1063,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
           onFilter={setStatusFilter}
           counts={statusCounts}
           staleCount={staleCount}
+          underperformingCount={underperformingCount}
         />
         {/* Campaign filter chips */}
         {localCampaigns.length > 0 && (
