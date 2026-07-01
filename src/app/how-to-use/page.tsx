@@ -169,6 +169,22 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'DSCHC', name: 'Date Sours Cherry Cola' },
     ],
   },
+  {
+    client: 'ESW Beauty', code: 'ESW',
+    products: [
+      { code: 'MBP',  name: 'Multiple Beauty Products' },
+      { code: 'SMLE', name: 'Strawberry Matcha Latte Eye Patch' },
+      { code: 'SCM',  name: 'Strawberry & Cream Mask' },
+      { code: 'MIST', name: 'Mist' },
+      { code: 'GLP',  name: 'Gloss Lip Treatments' },
+      { code: 'SCR',  name: 'Strawberry Coco Rose' },
+      { code: 'BSK',  name: 'Beauty Sleep Kit' },
+      { code: 'RSK',  name: 'Rise and Shine Kit' },
+      { code: 'ASK',  name: 'Awaken Skin Kit' },
+      { code: 'GHK',  name: 'Get Hydrated Kit' },
+      { code: 'PDRN', name: 'PDRN' },
+    ],
+  },
 ]
 
 // Legacy content-type codes — retained for filename back-compat only.
