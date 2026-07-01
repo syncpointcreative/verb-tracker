@@ -114,11 +114,20 @@ async function runMondayAlert(
     return NextResponse.json({ ok: true, run: 'monday', alerted: 0, message: 'Nothing in Refresh Soon range' })
   }
 
-  // Parallel: fetch Ready-to-Upload assets (replacement already queued) and all live
-  // assets with tiktok_adgroup (for per-ad-group deck coverage analysis).
-  const [rtuResult, liveResult] = await Promise.all([
+  // Parallel: fetch Ready-to-Upload assets (replacement already queued), all live
+  // assets with tiktok_adgroup (for per-ad-group deck coverage), and all live assets
+  // the scorer has flagged needs_replacing (performance-based creative replacements).
+  const [rtuResult, liveResult, needsReplacingResult] = await Promise.all([
     supabase.from('assets').select('client_id, product_id, stage').eq('status', 'Ready to Upload'),
     supabase.from('assets').select('client_id, tiktok_adgroup').eq('status', 'Live / Running').not('tiktok_adgroup', 'is', null),
+    supabase.from('assets')
+      .select(`
+        id, asset_name, stage, client_id, product_id, freshness_reason,
+        product:products(name, discontinued),
+        client:clients(id, name, slug)
+      `)
+      .eq('status', 'Live / Running')
+      .eq('freshness_state', 'needs_replacing'),
   ])
 
   // client_id:product_id:stage combos that already have a replacement queued
@@ -197,6 +206,57 @@ async function runMondayAlert(
       ]
     })
 
+    // Performance-based replacements — assets the scorer flagged needs_replacing,
+    // grouped by product+stage. Only mention the specific creative when the reason
+    // is informative: never_performed (kill the concept) or faded (repeat the concept).
+    // aged_out just needs fresh content — no creative context required.
+    type NeedsReplacingRow = {
+      id: string; asset_name: string; stage: string; client_id: string; product_id: string
+      freshness_reason: string | null
+      product: { name: string; discontinued?: boolean } | null
+      client: { id: string; name: string; slug: string } | null
+    }
+    const perfReplacements = ((needsReplacingResult.data ?? []) as unknown as NeedsReplacingRow[])
+      .filter(a => a.client_id === client.id)
+      .filter(a => !(a.product as { discontinued?: boolean } | null)?.discontinued)
+      // exclude any already surfaced by the time-based section or covered by RTU
+      .filter(a => !coveredByRTU.has(`${a.client_id}:${a.product_id}:${a.stage}`))
+      .filter(a => !needsAlert.some(n => n.id === a.id))
+
+    const perfLines: string[] = []
+    // de-dupe by product+stage; keep the most informative reason per combo
+    const perfSeen = new Map<string, NeedsReplacingRow>()
+    for (const a of perfReplacements) {
+      const key = `${a.product_id}:${a.stage}`
+      const existing = perfSeen.get(key)
+      // prefer never_performed > faded > aged_out for the creative callout
+      if (!existing || a.freshness_reason === 'never_performed') perfSeen.set(key, a)
+    }
+    for (const [, a] of perfSeen) {
+      const product = a.product?.name ?? 'Unknown product'
+      const stageEmoji = STAGE_EMOJI[a.stage] ?? '•'
+      const reason = a.freshness_reason
+      // strip filename cruft for a readable concept name
+      const concept = a.asset_name.replace(/\.[^.]+$/, '').split('-').slice(4).join('-').replace(/\d{6}$/, '').replace(/-$/, '').trim()
+      let line = `    › ${stageEmoji} *${product}* — ${a.stage} needs new creative`
+      if (reason === 'never_performed' && concept) {
+        line += `\n      💀 _Kill concept: "${concept}" — underperformed from day one_`
+      } else if (reason === 'faded' && concept) {
+        line += `\n      📉 _Concept worked early — make a fresh variant of "${concept}"_`
+      }
+      perfLines.push(line)
+    }
+
+    const perfBlock = perfLines.length > 0 ? [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `🔴 *Performance-Based Replacements*\n${perfLines.join('\n')}`,
+        },
+      },
+    ] : []
+
     // Ad group deck coverage — flag groups with < 3 live scorer-matched creatives
     const clientAdgroups = adgroupCounts.get(client.id)
     const thinAdgroups: { name: string; count: number }[] = []
@@ -222,6 +282,7 @@ async function runMondayAlert(
     const summaryParts = [`*${count} asset${count !== 1 ? 's' : ''}* hitting Refresh Soon (${REFRESH_SOON_DAYS}+ days live)`]
     if (coveredCount > 0) summaryParts.push(`*${coveredCount}* replacement${coveredCount !== 1 ? 's' : ''} already in queue`)
     if (uncoveredCount > 0) summaryParts.push(`*${uncoveredCount}* still need new creative`)
+    if (perfSeen.size > 0) summaryParts.push(`*${perfSeen.size}* flagged by performance scorer`)
 
     const message = {
       channel: channelId,
@@ -236,6 +297,7 @@ async function runMondayAlert(
           text: { type: 'mrkdwn', text: summaryParts.join(' · ') },
         },
         ...stageBlocks,
+        ...perfBlock,
         ...coverageBlocks,
         { type: 'divider' },
         {
