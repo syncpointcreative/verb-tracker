@@ -104,7 +104,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   SCM: 'Strawberry & Cream Mask', MIST: 'Mist', GLP: 'Gloss Lip Treatments',
   SCR: 'Strawberry Coco Rose', BSK: 'Beauty Sleep Kit',
   RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
-  GHK: 'Get Hydrated Kit',
+  GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
