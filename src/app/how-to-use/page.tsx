@@ -185,6 +185,14 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'PDRN', name: 'PDRN' },
     ],
   },
+  {
+    client: 'E-Patrol', code: 'EPAT',
+    products: [
+      { code: 'LC', name: 'Longevity Coffee' },
+      { code: 'AC', name: 'Alpenglow Cocoa' },
+      { code: 'FF', name: 'Farmstand Fruit' },
+    ],
+  },
 ]
 
 // Legacy content-type codes — retained for filename back-compat only.
