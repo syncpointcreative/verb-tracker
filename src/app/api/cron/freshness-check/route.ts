@@ -2,60 +2,40 @@
  * GET /api/cron/freshness-check
  *
  * Runs Monday and Thursday via Vercel cron.
+ * Sends a single Slack message to #asset-needs covering all clients.
  *
- * Monday — "This Week's Content Needs"
- *   All assets ≥15 days live, grouped by client/stage.
- *   Stamps refresh_notified_at so Thursday can track the week's baseline.
+ * Sections (performance-based only, no age/spend/ROAS):
+ *   💀 Kill These        — needs_replacing + never_performed (don't repeat style)
+ *   📉 Fading            — needs_replacing + faded (fresh variant OK)
+ *   🔴 Non-Performing    — needs_replacing + other reason
+ *   ⚠️  Watch List        — underperforming (may need replacing in ~2 weeks)
+ *   📋 What We Need      — table: Client | Stage | Product (all needs_replacing, deduped by combo)
  *
- * Thursday — "Remaining Content Needs"
- *   Takes Monday's list, checks which product+stage combos got new
- *   Slack-submitted creative this week. Shows strikethrough for completed,
- *   bold for still outstanding.
+ * Monday  → "This Week's Content Needs"
+ * Thursday → "Remaining Content Needs" (same logic, same data)
  *
  * Manual testing:
  *   curl ".../api/cron/freshness-check?run=monday" -H "Authorization: Bearer <CRON_SECRET>"
  *   curl ".../api/cron/freshness-check?run=thursday" -H "Authorization: Bearer <CRON_SECRET>"
- *
- * Required env vars:
- *   CRON_SECRET                  — must match Authorization: Bearer header
- *   SLACK_BOT_TOKEN              — bot token with chat:write scope
- *   SLACK_ASSET_NEEDS_CHANNEL_ID — channel ID for #asset-needs
- *   NEXT_PUBLIC_APP_URL          — e.g. https://verb-tracker.vercel.app
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { REFRESH_SOON_DAYS } from '@/lib/constants'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-function getRelevantDate(asset: {
-  status: string
-  date_live: string | null
-  date_added: string | null
-}): string | null {
-  if (asset.status === 'Live / Running' && asset.date_live) return asset.date_live
-  return asset.date_added
+type AssetRow = {
+  id: string
+  asset_name: string
+  stage: string
+  client_id: string
+  product_id: string
+  freshness_reason: string | null
+  product: { name: string; discontinued?: boolean } | null
+  client: { name: string } | null
 }
 
-/** Compare whole UTC calendar days to avoid time-of-day drift. */
-function daysSince(dateStr: string): number {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const then = Date.UTC(year, month - 1, day)
-  const now = new Date()
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  return Math.floor((today - then) / (1000 * 60 * 60 * 24))
-}
-
-/** Returns the ISO timestamp for midnight UTC on the most recent Monday. */
-function getMostRecentMonday(): string {
-  const now = new Date()
-  const dow = now.getUTCDay() // 0=Sun, 1=Mon … 6=Sat
-  const daysBack = dow === 0 ? 6 : dow - 1
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysBack)
-  ).toISOString()
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postToSlack(token: string, message: object): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('https://slack.com/api/chat.postMessage', {
@@ -66,398 +46,194 @@ async function postToSlack(token: string, message: object): Promise<{ ok: boolea
   return res.json() as Promise<{ ok: boolean; error?: string }>
 }
 
-const STAGE_EMOJI: Record<string, string> = {
-  Awareness:     '👀',
-  Consideration: '🤔',
-  Conversion:    '🎯',
+/** Extract a readable concept name from the asset filename. */
+function conceptName(assetName: string): string {
+  // Convention: CLIENT-PRODUCT-STAGE-ConceptName-MMDDYY
+  const parts = assetName.replace(/\.[^.]+$/, '').split('-')
+  return parts
+    .slice(3)                          // skip client, product, stage codes
+    .filter(p => !/^\d{6}$/.test(p))  // strip trailing date
+    .join('-')
+    .trim()
 }
 
-const STAGE_SUGGESTION: Record<string, string> = {
-  Awareness:     'New hook video — stop the scroll, introduce product',
-  Consideration: 'Fresh demo, tutorial, or testimonial showing value',
-  Conversion:    'New promo/offer-led video with clear CTA',
-  'Community Interaction': 'New community/engagement-led video (follows, likes, comments, shares)',
+function clientName(a: AssetRow): string {
+  return a.client?.name ?? 'Unknown'
+}
+function productName(a: AssetRow): string {
+  return a.product?.name ?? 'Unknown'
+}
+function isActive(a: AssetRow): boolean {
+  return !(a.product as { discontinued?: boolean } | null)?.discontinued
 }
 
-const STAGES = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
+// ─── Build and send the alert ─────────────────────────────────────────────────
 
-// ─── Monday: Full weekly alert ───────────────────────────────────────────────
-
-async function runMondayAlert(
+async function sendAlert(
   supabase: ReturnType<typeof createServerClient>,
   channelId: string,
-  appUrl: string,
-  token: string
+  token: string,
+  headerLabel: string,
 ) {
-  // Paused assets are intentionally offline (e.g. out of stock) — skip them
-  const { data: assets, error } = await supabase
-    .from('assets')
-    .select(`
-      id, status, stage, content_type, date_added, date_live, client_id, product_id,
-      product:products(name, discontinued),
-      client:clients(id, name, slug)
-    `)
-    .in('status', ['Live / Running', 'Needs Refresh / Missing'])
+  const SELECT = `
+    id, asset_name, stage, client_id, product_id, freshness_reason,
+    product:products(name, discontinued),
+    client:clients(name)
+  `
 
-  if (error) {
-    console.error('[freshness/monday] query error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const needsAlert = (assets ?? []).filter(a => {
-    if ((a.product as unknown as { discontinued?: boolean } | null)?.discontinued) return false
-    const d = getRelevantDate(a)
-    return d ? daysSince(d) >= REFRESH_SOON_DAYS : false
-  })
-
-  if (!needsAlert.length) {
-    return NextResponse.json({ ok: true, run: 'monday', alerted: 0, message: 'Nothing in Refresh Soon range' })
-  }
-
-  // Parallel: fetch Ready-to-Upload assets (replacement already queued), all live
-  // assets with tiktok_adgroup (for per-ad-group deck coverage), and all live assets
-  // the scorer has flagged needs_replacing (performance-based creative replacements).
-  const [rtuResult, liveResult, needsReplacingResult] = await Promise.all([
-    supabase.from('assets').select('client_id, product_id, stage').eq('status', 'Ready to Upload'),
-    supabase.from('assets').select('client_id, tiktok_adgroup').eq('status', 'Live / Running').not('tiktok_adgroup', 'is', null),
-    supabase.from('assets')
-      .select(`
-        id, asset_name, stage, client_id, product_id, freshness_reason,
-        product:products(name, discontinued),
-        client:clients(id, name, slug)
-      `)
+  const [replacingResult, underperformingResult] = await Promise.all([
+    supabase
+      .from('assets')
+      .select(SELECT)
       .eq('status', 'Live / Running')
       .eq('freshness_state', 'needs_replacing'),
+    supabase
+      .from('assets')
+      .select(SELECT)
+      .eq('status', 'Live / Running')
+      .eq('freshness_state', 'underperforming'),
   ])
 
-  // client_id:product_id:stage combos that already have a replacement queued
-  const coveredByRTU = new Set(
-    (rtuResult.data ?? []).map(a => `${a.client_id}:${a.product_id}:${a.stage}`)
-  )
-
-  // Per-client adgroup live-creative counts (from scorer-matched assets only)
-  const adgroupCounts = new Map<string, Map<string, number>>()
-  for (const a of (liveResult.data ?? [])) {
-    if (!a.tiktok_adgroup) continue
-    if (!adgroupCounts.has(a.client_id)) adgroupCounts.set(a.client_id, new Map())
-    const clientMap = adgroupCounts.get(a.client_id)!
-    for (const ag of a.tiktok_adgroup.split(' · ').map((s: string) => s.trim()).filter(Boolean)) {
-      clientMap.set(ag, (clientMap.get(ag) ?? 0) + 1)
-    }
+  if (replacingResult.error || underperformingResult.error) {
+    const err = replacingResult.error ?? underperformingResult.error
+    console.error('[freshness-check] query error:', err)
+    return NextResponse.json({ error: err!.message }, { status: 500 })
   }
 
-  // Group needs by client
-  const byClient = new Map<string, typeof needsAlert>()
-  for (const a of needsAlert) {
-    if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
-    byClient.get(a.client_id)!.push(a)
+  const replacing     = ((replacingResult.data ?? []) as unknown as AssetRow[]).filter(isActive)
+  const underperforming = ((underperformingResult.data ?? []) as unknown as AssetRow[]).filter(isActive)
+
+  const killed   = replacing.filter(a => a.freshness_reason === 'never_performed')
+  const fading   = replacing.filter(a => a.freshness_reason === 'faded')
+  const nonPerf  = replacing.filter(a => a.freshness_reason !== 'never_performed' && a.freshness_reason !== 'faded')
+
+  if (!replacing.length && !underperforming.length) {
+    return NextResponse.json({ ok: true, skipped: true, message: 'Nothing flagged' })
   }
 
-  let totalAlerted = 0
+  const blocks: object[] = []
 
-  for (const [, clientAssets] of byClient) {
-    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
-    if (!client) continue
+  // ── Header ────────────────────────────────────────────────────────────────
+  blocks.push({
+    type: 'header',
+    text: { type: 'plain_text', text: `📋 ${headerLabel}`, emoji: true },
+  })
 
-    const isCovered = (a: typeof clientAssets[0]) =>
-      coveredByRTU.has(`${a.client_id}:${a.product_id}:${a.stage}`)
+  // ── 💀 Kill These ─────────────────────────────────────────────────────────
+  if (killed.length) {
+    const lines = killed.map(a => {
+      const concept = conceptName(a.asset_name)
+      return `    💀 *${clientName(a)}* — ${a.stage} — ${productName(a)}${concept ? `: _"${concept}"_` : ''}`
+    })
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*💀 Kill These — don't repeat this style*\n${lines.join('\n')}`,
+      },
+    })
+  }
 
-    const uncoveredCount = clientAssets.filter(a => !isCovered(a)).length
-    const coveredCount   = clientAssets.filter(a => isCovered(a)).length
-    const count          = clientAssets.length
+  // ── 📉 Fading ─────────────────────────────────────────────────────────────
+  if (fading.length) {
+    const lines = fading.map(a => {
+      const concept = conceptName(a.asset_name)
+      return `    📉 *${clientName(a)}* — ${a.stage} — ${productName(a)}${concept ? `: _"${concept}"_ (fresh variant OK)` : ''}`
+    })
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📉 Fading — make a fresh variant*\n${lines.join('\n')}`,
+      },
+    })
+  }
 
-    const sorted = [...clientAssets].sort((a, b) =>
-      daysSince(getRelevantDate(b) ?? '') - daysSince(getRelevantDate(a) ?? '')
+  // ── 🔴 Non-Performing ─────────────────────────────────────────────────────
+  if (nonPerf.length) {
+    const lines = nonPerf.map(a =>
+      `    🔴 *${clientName(a)}* — ${a.stage} — ${productName(a)}`
     )
-
-    // One section block per stage. Covered assets (RTU replacement queued) get a ✅
-    // strikethrough; uncovered assets show the normal ask.
-    const stageBlocks = STAGES.flatMap(stage => {
-      const stageAssets = sorted.filter(a => a.stage === stage)
-      if (!stageAssets.length) return []
-
-      const needed  = stageAssets.filter(a => !isCovered(a))
-      const covered = stageAssets.filter(a => isCovered(a))
-
-      const lines: string[] = [
-        ...needed.map(a => {
-          const days    = daysSince(getRelevantDate(a) ?? '')
-          const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
-          const type    = a.content_type ?? 'Unknown type'
-          return `    › ${product} — ${type} — *${days} days* live`
-        }),
-        ...covered.map(a => {
-          const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
-          const type    = a.content_type ?? 'Unknown type'
-          return `    ✅ ~${product} — ${type}~ _(replacement in queue)_`
-        }),
-      ]
-
-      const askLine = needed.length > 0 ? `\n    _Ask: ${STAGE_SUGGESTION[stage] ?? ''}_` : ''
-
-      return [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}${askLine}`,
-          },
-        },
-      ]
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🔴 Non-Performing — needs replacing*\n${lines.join('\n')}`,
+      },
     })
+  }
 
-    // Performance-based replacements — assets the scorer flagged needs_replacing,
-    // grouped by product+stage. Only mention the specific creative when the reason
-    // is informative: never_performed (kill the concept) or faded (repeat the concept).
-    // aged_out just needs fresh content — no creative context required.
-    type NeedsReplacingRow = {
-      id: string; asset_name: string; stage: string; client_id: string; product_id: string
-      freshness_reason: string | null
-      product: { name: string; discontinued?: boolean } | null
-      client: { id: string; name: string; slug: string } | null
-    }
-    const perfReplacements = ((needsReplacingResult.data ?? []) as unknown as NeedsReplacingRow[])
-      .filter(a => a.client_id === client.id)
-      .filter(a => !(a.product as { discontinued?: boolean } | null)?.discontinued)
-      // exclude any already surfaced by the time-based section or covered by RTU
-      .filter(a => !coveredByRTU.has(`${a.client_id}:${a.product_id}:${a.stage}`))
-      .filter(a => !needsAlert.some(n => n.id === a.id))
-
-    const perfLines: string[] = []
-    // de-dupe by product+stage; keep the most informative reason per combo
-    const perfSeen = new Map<string, NeedsReplacingRow>()
-    for (const a of perfReplacements) {
-      const key = `${a.product_id}:${a.stage}`
-      const existing = perfSeen.get(key)
-      // prefer never_performed > faded > aged_out for the creative callout
-      if (!existing || a.freshness_reason === 'never_performed') perfSeen.set(key, a)
-    }
-    for (const [, a] of perfSeen) {
-      const product = a.product?.name ?? 'Unknown product'
-      const stageEmoji = STAGE_EMOJI[a.stage] ?? '•'
-      const reason = a.freshness_reason
-      // strip filename cruft for a readable concept name
-      const concept = a.asset_name.replace(/\.[^.]+$/, '').split('-').slice(4).join('-').replace(/\d{6}$/, '').replace(/-$/, '').trim()
-      let line = `    › ${stageEmoji} *${product}* — ${a.stage} needs new creative`
-      if (reason === 'never_performed' && concept) {
-        line += `\n      💀 _Kill concept: "${concept}" — underperformed from day one_`
-      } else if (reason === 'faded' && concept) {
-        line += `\n      📉 _Concept worked early — make a fresh variant of "${concept}"_`
-      }
-      perfLines.push(line)
-    }
-
-    const perfBlock = perfLines.length > 0 ? [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `🔴 *Performance-Based Replacements*\n${perfLines.join('\n')}`,
-        },
+  // ── ⚠️ Underperforming watch list ─────────────────────────────────────────
+  if (underperforming.length) {
+    const lines = underperforming.map(a =>
+      `    ⚠️ *${clientName(a)}* — ${a.stage} — ${productName(a)}`
+    )
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*⚠️ On Deck — watch list (may need replacing in ~2 weeks)*\n${lines.join('\n')}`,
       },
-    ] : []
-
-    // Ad group deck coverage — flag groups with < 3 live scorer-matched creatives
-    const clientAdgroups = adgroupCounts.get(client.id)
-    const thinAdgroups: { name: string; count: number }[] = []
-    if (clientAdgroups) {
-      for (const [ag, cnt] of clientAdgroups) {
-        if (cnt < 3) thinAdgroups.push({ name: ag, count: cnt })
-      }
-      thinAdgroups.sort((a, b) => a.count - b.count)
-    }
-
-    const coverageBlocks = thinAdgroups.length > 0 ? [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `💡 *Ad Group Coverage* _(thin groups — target 3+ live creatives)_\n${thinAdgroups.map(ag =>
-            `    ${ag.count === 1 ? '🚨' : '⚠️'} ${ag.name}: *${ag.count}* live`
-          ).join('\n')}`,
-        },
-      },
-    ] : []
-
-    const summaryParts = [`*${count} asset${count !== 1 ? 's' : ''}* hitting Refresh Soon (${REFRESH_SOON_DAYS}+ days live)`]
-    if (coveredCount > 0) summaryParts.push(`*${coveredCount}* replacement${coveredCount !== 1 ? 's' : ''} already in queue`)
-    if (uncoveredCount > 0) summaryParts.push(`*${uncoveredCount}* still need new creative`)
-    if (perfSeen.size > 0) summaryParts.push(`*${perfSeen.size}* flagged by performance scorer`)
-
-    const message = {
-      channel: channelId,
-      text: `📋 This Week's Content Needs — ${client.name}`,
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: `📋 This Week's Content Needs — ${client.name}`, emoji: true },
-        },
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text: summaryParts.join(' · ') },
-        },
-        ...stageBlocks,
-        ...perfBlock,
-        ...coverageBlocks,
-        { type: 'divider' },
-        {
-          type: 'actions',
-          elements: [{
-            type: 'button',
-            style: 'primary',
-            text: { type: 'plain_text', text: `View ${client.name} Dashboard →`, emoji: true },
-            url: `${appUrl}/${client.slug}`,
-          }],
-        },
-      ],
-    }
-
-    const result = await postToSlack(token, message)
-    if (!result.ok) {
-      console.error(`[freshness/monday] Slack error for ${client.name}:`, result.error)
-      continue
-    }
-
-    // Stamp all assets (covered + uncovered) so Thursday has the full week's baseline
-    await supabase
-      .from('assets')
-      .update({ refresh_notified_at: new Date().toISOString() })
-      .in('id', clientAssets.map(a => a.id))
-
-    totalAlerted += uncoveredCount
+    })
   }
 
-  return NextResponse.json({ ok: true, run: 'monday', alerted: totalAlerted })
-}
-
-// ─── Thursday: Progress check ────────────────────────────────────────────────
-
-async function runThursdayAlert(
-  supabase: ReturnType<typeof createServerClient>,
-  channelId: string,
-  appUrl: string,
-  token: string
-) {
-  const lastMonday = getMostRecentMonday()
-
-  // All assets from Monday's batch (by refresh_notified_at, regardless of current status)
-  const { data: mondayAssets, error } = await supabase
-    .from('assets')
-    .select(`
-      id, status, stage, content_type, date_added, date_live, client_id, product_id,
-      product:products(name, discontinued),
-      client:clients(id, name, slug)
-    `)
-    .gte('refresh_notified_at', lastMonday)
-
-  if (error) {
-    console.error('[freshness/thursday] query error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  // ── Table: What We Need to Create ─────────────────────────────────────────
+  // Dedupe by client+stage+product — one row per unique combo
+  const seen = new Set<string>()
+  const tableRows: { client: string; stage: string; product: string }[] = []
+  for (const a of [...killed, ...fading, ...nonPerf]) {
+    const key = `${clientName(a)}|${a.stage}|${productName(a)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    tableRows.push({ client: clientName(a), stage: a.stage, product: productName(a) })
   }
-
-  if (!mondayAssets?.length) {
-    return NextResponse.json({ ok: true, run: 'thursday', message: 'No assets from Monday alert — run Monday first' })
-  }
-
-  // New Slack-submitted content delivered since Monday (client:product:stage combos)
-  const { data: newContent } = await supabase
-    .from('assets')
-    .select('client_id, product_id, stage')
-    .not('slack_message_ts', 'is', null)
-    .gte('created_at', lastMonday)
-
-  const deliveredThisWeek = new Set(
-    (newContent ?? []).map(a => `${a.client_id}:${a.product_id}:${a.stage}`)
+  tableRows.sort((a, b) =>
+    a.client.localeCompare(b.client) || a.stage.localeCompare(b.stage)
   )
 
-  // A need is completed only when new creative matching that client:product:stage
-  // combo has been submitted to #creative-assets-only this week (has a slack_message_ts).
-  // A pulled/removed asset does NOT count — that makes the need more urgent, not less.
-  const isCompleted = (a: typeof mondayAssets[0]) =>
-    deliveredThisWeek.has(`${a.client_id}:${a.product_id}:${a.stage}`)
+  if (tableRows.length) {
+    const colW = {
+      client:  Math.max(6, ...tableRows.map(r => r.client.length)),
+      stage:   Math.max(5, ...tableRows.map(r => r.stage.length)),
+      product: Math.max(7, ...tableRows.map(r => r.product.length)),
+    }
+    const pad = (s: string, w: number) => s.padEnd(w)
+    const sep = `${'-'.repeat(colW.client)}-+-${'-'.repeat(colW.stage)}-+-${'-'.repeat(colW.product)}`
+    const header = `${pad('Client', colW.client)} | ${pad('Stage', colW.stage)} | Product`
+    const rows = tableRows.map(r =>
+      `${pad(r.client, colW.client)} | ${pad(r.stage, colW.stage)} | ${r.product}`
+    )
+    const table = [header, sep, ...rows].join('\n')
 
-  // Filter out discontinued products before building the report
-  const activeAssets = mondayAssets.filter(
-    a => !(a.product as unknown as { discontinued?: boolean } | null)?.discontinued
-  )
-
-  // Group by client
-  const byClient = new Map<string, typeof activeAssets>()
-  for (const a of activeAssets) {
-    if (!byClient.has(a.client_id)) byClient.set(a.client_id, [])
-    byClient.get(a.client_id)!.push(a)
-  }
-
-  let clientsPosted = 0
-
-  for (const [, clientAssets] of byClient) {
-    const client = clientAssets[0].client as unknown as { id: string; name: string; slug: string } | null
-    if (!client) continue
-
-    const remaining  = clientAssets.filter(a => !isCompleted(a))
-    const completed  = clientAssets.filter(a => isCompleted(a))
-
-    const stageBlocks = STAGES.flatMap(stage => {
-      const stageAssets = clientAssets.filter(a => a.stage === stage)
-      if (!stageAssets.length) return []
-
-      const lines = stageAssets.map(a => {
-        const product = (a.product as unknown as { name: string } | null)?.name ?? 'Unknown product'
-        const type    = a.content_type ?? 'Unknown type'
-        const days    = daysSince(getRelevantDate(a) ?? '')
-        return isCompleted(a)
-          ? `    ~› ${product} — ${type}~`
-          : `    *› ${product} — ${type} — ${days} days live*`
-      })
-
-      return [
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text: `${STAGE_EMOJI[stage] ?? '•'} *${stage}*\n${lines.join('\n')}` },
-        },
-      ]
+    blocks.push({ type: 'divider' })
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📋 What We Need to Create*\n\`\`\`${table}\`\`\``,
+      },
     })
-
-    const summaryText = remaining.length === 0
-      ? `✅ All ${completed.length} assets addressed this week — great work!`
-      : `*${remaining.length} still outstanding* · ${completed.length} completed this week`
-
-    const message = {
-      channel: channelId,
-      text: `📌 Remaining Content Needs — ${client.name}`,
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: `📌 Remaining Content Needs — ${client.name}`, emoji: true },
-        },
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text: summaryText },
-        },
-        ...stageBlocks,
-        { type: 'divider' },
-        {
-          type: 'actions',
-          elements: [{
-            type: 'button',
-            style: 'primary',
-            text: { type: 'plain_text', text: `View ${client.name} Dashboard →`, emoji: true },
-            url: `${appUrl}/${client.slug}`,
-          }],
-        },
-      ],
-    }
-
-    const result = await postToSlack(token, message)
-    if (!result.ok) {
-      console.error(`[freshness/thursday] Slack error for ${client.name}:`, result.error)
-      continue
-    }
-
-    clientsPosted++
   }
 
-  return NextResponse.json({ ok: true, run: 'thursday', clients_posted: clientsPosted })
+  const result = await postToSlack(token, {
+    channel: channelId,
+    text: `📋 ${headerLabel}`,
+    blocks,
+  })
+
+  if (!result.ok) {
+    console.error('[freshness-check] Slack error:', result.error)
+    return NextResponse.json({ error: result.error }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    killed: killed.length,
+    fading: fading.length,
+    nonPerforming: nonPerf.length,
+    underperforming: underperforming.length,
+    tableRows: tableRows.length,
+  })
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -473,22 +249,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'SLACK_ASSET_NEEDS_CHANNEL_ID not configured' }, { status: 500 })
   }
 
-  const token  = process.env.SLACK_BOT_TOKEN ?? ''
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
+  const token = process.env.SLACK_BOT_TOKEN ?? ''
 
-  // ?run=monday or ?run=thursday overrides day detection for manual testing
   const runOverride = req.nextUrl.searchParams.get('run')
   const dow         = new Date().getUTCDay() // 0=Sun 1=Mon … 4=Thu
   const isMonday    = runOverride === 'monday'   || (!runOverride && dow === 1)
   const isThursday  = runOverride === 'thursday' || (!runOverride && dow === 4)
 
   if (!isMonday && !isThursday) {
-    return NextResponse.json({ ok: true, skipped: true, message: 'Only runs Monday and Thursday — use ?run=monday or ?run=thursday to test' })
+    return NextResponse.json({
+      ok: true, skipped: true,
+      message: 'Only runs Monday and Thursday — use ?run=monday or ?run=thursday to test',
+    })
   }
 
-  const supabase = createServerClient()
+  const supabase    = createServerClient()
+  const headerLabel = isMonday
+    ? "This Week's Content Needs"
+    : "Remaining Content Needs"
 
-  return isMonday
-    ? runMondayAlert(supabase, channelId, appUrl, token)
-    : runThursdayAlert(supabase, channelId, appUrl, token)
+  return sendAlert(supabase, channelId, token, headerLabel)
 }
