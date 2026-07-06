@@ -58,7 +58,6 @@ export const STATUS_CONFIG: Record<AssetStatus, { bg: string; text: string; dot:
 
 export const TARGET_ASSETS_PER_STAGE = 3
 export const EXPIRY_DAYS = 14        // assets ≤14 days (Fresh/Monitor) = covered; 15+ (Refresh Soon) = needs new creative
-export const REFRESH_SOON_DAYS = 15  // day threshold that triggers Refresh Soon + Slack alert
 export const SLACK_CHANNEL_ID = 'C0B59BHPG81'
 // Workspace-specific base URL — used to build deep links that open in the correct workspace
 // instead of defaulting to whichever workspace the user has active in their Slack app.
