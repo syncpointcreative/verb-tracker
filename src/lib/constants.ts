@@ -94,7 +94,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
   CCSD: 'Chili Crunch Sushi Dip',
   LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
-  VL: 'Vanilla Latte Protein', CWB: 'Coffee With Benefits',
+  VL: 'Vanilla Latte Protein', CWB: 'Coffee With Benefits', WWL: 'WW Whipped Lemonade',
   // Joolies — Date Sours flavors
   ADF: 'All Date Flavors',
   DSBR: 'Date Sours Blue Raspberry', DSPCH: 'Date Sours Peachy',
