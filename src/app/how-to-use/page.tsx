@@ -184,6 +184,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'ASK',  name: 'Awaken Skin Kit' },
       { code: 'GHK',  name: 'Get Hydrated Kit' },
       { code: 'PDRN', name: 'PDRN' },
+      { code: 'AFF',  name: 'Affiliate' },
     ],
   },
   {
