@@ -94,7 +94,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   JHCG: 'Joint Health Citrus Ginger', SSVM: 'Sleep Support Vanilla Mint',
   CCSD: 'Chili Crunch Sushi Dip',
   LEM: 'Lemonade', GLEM: 'Grapefruit Lemonade',
-  VL: 'Vanilla Latte Protein', CWB: 'Coffee With Benefits',
+  VL: 'Vanilla Latte Protein', CWB: 'Coffee With Benefits', WWL: 'WW Whipped Lemonade',
   // Joolies — Date Sours flavors
   ADF: 'All Date Flavors',
   DSBR: 'Date Sours Blue Raspberry', DSPCH: 'Date Sours Peachy',
@@ -104,7 +104,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   SCM: 'Strawberry & Cream Mask', MIST: 'Mist', GLP: 'Gloss Lip Treatments',
   SCR: 'Strawberry Coco Rose', BSK: 'Beauty Sleep Kit',
   RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
-  GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',
+  GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',    AFF: 'Affiliate',
   // E-Patrol
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
 }
