@@ -195,6 +195,12 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'FF', name: 'Farmstand Fruit' },
     ],
   },
+  {
+    client: 'Junkless', code: 'JUNK',
+    products: [
+      { code: 'PBVP', name: 'Protein Bar Variety Pack' },
+    ],
+  },
 ]
 
 // Legacy content-type codes — retained for filename back-compat only.

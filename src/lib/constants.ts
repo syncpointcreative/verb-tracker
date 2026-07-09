@@ -70,7 +70,7 @@ export const CLIENT_CODES: Record<string, string> = {
   BIOM: 'Biom', CHOMPS: 'Chomps', HIMA: 'Himapure',
   HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
   MOMO: 'Momofuku', JOO: 'Joolies', ESW: 'ESW Beauty',
-  EPAT: 'E-Patrol',
+  EPAT: 'E-Patrol', JUNK: 'Junkless',
 }
 export const PRODUCT_CODES: Record<string, string> = {
   FT: 'FaceTub',
@@ -107,6 +107,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',    AFF: 'Affiliate',
   // E-Patrol
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
+  // Junkless
+  PBVP: 'Protein Bar Variety Pack',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
