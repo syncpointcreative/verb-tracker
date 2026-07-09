@@ -60,6 +60,21 @@ export async function POST(req: NextRequest) {
   if (!VALID_STAGES.has(stage as Stage)) {
     return NextResponse.json({ error: `Invalid stage. Must be one of: ${[...VALID_STAGES].join(', ')}` }, { status: 400 })
   }
+  if (body.status && !VALID_STATUSES.has(body.status as AssetStatus)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+  }
+
+  const status = (body.status as AssetStatus) ?? 'Needs Refresh / Missing'
+  const today = new Date().toISOString().split('T')[0]
+
+  // Stamp date_live when an asset is created directly as Live/Running. The PATCH
+  // auto-stamp only fires on status *transitions*, so assets inserted straight as
+  // Live (bulk imports, API) bypassed it and landed with date_live=null — which
+  // silently disabled the freshness engine's age guards. Honor an explicit date_live
+  // if the caller provided one; otherwise stamp today when created Live.
+  const date_live = 'date_live' in body
+    ? (body.date_live ?? null)
+    : (status === 'Live / Running' ? today : null)
 
   const { data, error } = await supabase
     .from('assets')
@@ -70,8 +85,10 @@ export async function POST(req: NextRequest) {
       asset_name,
       content_type:     body.content_type ?? null,
       file_name:        body.file_name ?? null,
-      status:           (body.status as AssetStatus) ?? 'Needs Refresh / Missing',
+      status,
       date_added:       body.date_added ?? null,
+      date_live,
+      status_changed_at: 'status' in body ? new Date().toISOString() : null,
       posted_by:        body.posted_by ?? null,
       notes:            body.notes ?? null,
       slack_message_ts: body.slack_message_ts ?? null,
