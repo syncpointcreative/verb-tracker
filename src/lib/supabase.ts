@@ -53,6 +53,7 @@ export interface Asset {
   tiktok_campaign: string | null   // analyzer-matched: campaign name(s) this asset runs in on TikTok
   tiktok_adgroup: string | null    // analyzer-matched: ad-group name(s) this asset runs in
   tiktok_synced_at: string | null
+  spark_item_id: string | null     // 19-digit TikTok video post ID for Spark Ad matching
   created_at: string
   updated_at: string
   // joined

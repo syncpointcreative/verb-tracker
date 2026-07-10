@@ -144,6 +144,7 @@ export default function AdminPage() {
     client_id: '', product_id: '', stage: 'Awareness', asset_name: '',
     content_type: '', file_name: '', status: 'Ready to Upload',
     date_added: new Date().toISOString().split('T')[0], posted_by: '', notes: '',
+    spark_item_id: '',
   })
 
   const clientProducts = products.filter(p => p.client_id === form.client_id)
@@ -165,12 +166,13 @@ export default function AdminPage() {
         file_name: form.file_name || null,
         posted_by: form.posted_by || null,
         notes: form.notes || null,
+        spark_item_id: form.spark_item_id || null,
       }),
     })
     setSaving(null)
     if (res.ok) {
       showToast('Asset added ✓')
-      setForm(f => ({ ...f, asset_name: '', file_name: '', notes: '', posted_by: '' }))
+      setForm(f => ({ ...f, asset_name: '', file_name: '', notes: '', posted_by: '', spark_item_id: '' }))
       load()
     } else {
       showToast('Error — check console')
@@ -679,6 +681,20 @@ export default function AdminPage() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {form.status === 'Live / Running' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">TikTok Video URL or ID (Spark Ads)</label>
+              <input
+                type="text"
+                value={form.spark_item_id}
+                onChange={e => setForm(f => ({ ...f, spark_item_id: e.target.value }))}
+                placeholder="https://www.tiktok.com/@user/video/1234567890123456789 or 1234567890123456789"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Paste the full TikTok URL or 19-digit video ID. Used to match Spark Ads to TikTok campaigns.</p>
+            </div>
+          )}
 
           <button
             type="submit"
