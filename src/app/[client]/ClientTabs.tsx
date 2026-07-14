@@ -28,20 +28,12 @@ const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 
 type Tab = 'board' | 'assets' | 'archive' | 'brief'
 
-const isSpkAsset = (a: Asset) => a.asset_name.includes('-SPK-')
-
 export default function ClientTabs({ assets, products, campaigns, clientId, briefSections, missingCoverage, initialStatus }: Props) {
   const [tab, setTab]               = useState<Tab>('board')
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
   const [restoringId, setRestoringId] = useState<string | null>(null)
-  const [sparkFilter, setSparkFilter] = useState(false)
-
-  const allActiveAssets  = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
-  const archivedAssets   = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
-  const activeAssets     = sparkFilter
-    ? allActiveAssets.filter(isSpkAsset)
-    : allActiveAssets.filter(a => !isSpkAsset(a))
-  const spkCount         = allActiveAssets.filter(isSpkAsset).length
+  const activeAssets   = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
+  const archivedAssets = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
 
   // Shared status-change handler — keeps all tabs in sync without a page reload.
   // Both KanbanBoard and AssetTable call this after a successful PATCH so that
@@ -113,23 +105,6 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
       {/* Board tab — Kanban view */}
       {tab === 'board' && (
         <>
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setSparkFilter(v => !v)}
-              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
-                sparkFilter
-                  ? 'bg-amber-50 border-amber-300 text-amber-700 font-medium'
-                  : 'border-stone-200 text-stone-400 hover:text-stone-600 hover:border-stone-300'
-              }`}
-            >
-              ⚡ Spark
-              {spkCount > 0 && (
-                <span className={`text-[10px] px-1.5 py-0 rounded-full ${sparkFilter ? 'bg-amber-200 text-amber-800' : 'bg-stone-100 text-stone-400'}`}>
-                  {spkCount}
-                </span>
-              )}
-            </button>
-          </div>
           <KanbanBoard assets={activeAssets} campaigns={campaigns} clientId={clientId} initialStatus={initialStatus} onStatusChange={handleStatusChange} />
 
           {/* Missing coverage panel below the board */}

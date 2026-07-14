@@ -663,8 +663,9 @@ const ALL_ACTIVE_STATUSES: AssetStatus[] = [
   'Expired',
 ]
 
-const STALE_FILTER          = '__needs_replacing__'
+const STALE_FILTER           = '__needs_replacing__'
 const UNDERPERFORMING_FILTER = '__underperforming__'
+const SPARK_FILTER           = '__spark__'
 
 // Performance verdict from the analyzer — not an age cutoff.
 function isStale(asset: Asset): boolean {
@@ -675,18 +676,26 @@ function isUnderperforming(asset: Asset): boolean {
   return asset.freshness_state === 'underperforming'
 }
 
+// spark_item_id is the canonical indicator — name-based detection misses assets
+// that were sparked without an SPK code in the name.
+function isSparkAsset(asset: Asset): boolean {
+  return !!asset.spark_item_id
+}
+
 function FilterBar({
   activeFilter,
   onFilter,
   counts,
   staleCount,
   underperformingCount,
+  sparkCount,
 }: {
   activeFilter: string | null
   onFilter: (s: string | null) => void
   counts: Record<string, number>
   staleCount: number
   underperformingCount: number
+  sparkCount: number
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -751,6 +760,21 @@ function FilterBar({
           🔴 Needs Replacing
           <span className={`tabular-nums text-[10px] ${activeFilter === STALE_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
             {staleCount}
+          </span>
+        </button>
+      )}
+      {sparkCount > 0 && (
+        <button
+          onClick={() => onFilter(activeFilter === SPARK_FILTER ? null : SPARK_FILTER)}
+          className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+            activeFilter === SPARK_FILTER
+              ? 'bg-amber-50 text-amber-700 border-amber-300'
+              : 'text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700 bg-white'
+          }`}
+        >
+          ⚡ Spark
+          <span className={`tabular-nums text-[10px] ${activeFilter === SPARK_FILTER ? 'opacity-70' : 'text-stone-400'}`}>
+            {sparkCount}
           </span>
         </button>
       )}
@@ -976,8 +1000,9 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
     return counts
   }, [localAssets])
 
-  const staleCount          = useMemo(() => localAssets.filter(isStale).length, [localAssets])
+  const staleCount           = useMemo(() => localAssets.filter(isStale).length, [localAssets])
   const underperformingCount = useMemo(() => localAssets.filter(isUnderperforming).length, [localAssets])
+  const sparkCount           = useMemo(() => localAssets.filter(isSparkAsset).length, [localAssets])
 
   // Parse the " · "-delimited strings the scorer writes for tiktok_campaign / tiktok_adgroup.
   function splitTT(val: string | null | undefined): string[] {
@@ -1003,6 +1028,8 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
       ? localAssets.filter(isStale)
       : statusFilter === UNDERPERFORMING_FILTER
         ? localAssets.filter(isUnderperforming)
+        : statusFilter === SPARK_FILTER
+        ? localAssets.filter(isSparkAsset)
         : statusFilter
         ? localAssets.filter(a => a.status === statusFilter)
         : localAssets
@@ -1078,6 +1105,7 @@ export default function KanbanBoard({ assets: initialAssets, campaigns: initialC
           counts={statusCounts}
           staleCount={staleCount}
           underperformingCount={underperformingCount}
+          sparkCount={sparkCount}
         />
         {/* Campaign filter chips */}
         {localCampaigns.length > 0 && (
