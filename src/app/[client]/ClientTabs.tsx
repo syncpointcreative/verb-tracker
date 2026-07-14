@@ -18,6 +18,7 @@ interface Props {
   products: Product[]
   campaigns: Campaign[]
   clientId: string
+  clientSlug: string
   briefSections: BriefSection[]
   missingCoverage: MissingItem[]
   initialStatus?: string | null
@@ -28,10 +29,9 @@ const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 type Tab = 'board' | 'assets' | 'archive' | 'brief'
 
 export default function ClientTabs({ assets, products, campaigns, clientId, briefSections, missingCoverage, initialStatus }: Props) {
-  const [tab, setTab]           = useState<Tab>('board')
+  const [tab, setTab]               = useState<Tab>('board')
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
   const [restoringId, setRestoringId] = useState<string | null>(null)
-
   const activeAssets   = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
   const archivedAssets = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
 

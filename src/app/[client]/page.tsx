@@ -122,6 +122,7 @@ export default async function ClientPage({ params, searchParams }: Props) {
         products={allProducts}
         campaigns={allCampaigns}
         clientId={client.id}
+        clientSlug={client.slug}
         briefSections={briefSections}
         missingCoverage={missingCoverage}
         initialStatus={searchParams.status ?? null}

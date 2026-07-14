@@ -53,11 +53,23 @@ export interface Asset {
   tiktok_campaign: string | null   // analyzer-matched: campaign name(s) this asset runs in on TikTok
   tiktok_adgroup: string | null    // analyzer-matched: ad-group name(s) this asset runs in
   tiktok_synced_at: string | null
+  spark_item_id: string | null     // 19-digit TikTok video post ID for Spark Ad matching
   created_at: string
   updated_at: string
   // joined
   product?: Product
   client?: Client
+}
+
+export type SparkAd = {
+  id: string
+  client_id: string
+  tiktok_item_id: string
+  ad_name: string | null
+  campaign_name: string | null
+  adgroup_name: string | null
+  ad_status: string | null
+  synced_at: string | null
 }
 
 // Browser client (uses anon key — respects RLS)

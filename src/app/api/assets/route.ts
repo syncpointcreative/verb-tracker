@@ -61,6 +61,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Invalid stage. Must be one of: ${[...VALID_STAGES].join(', ')}` }, { status: 400 })
   }
 
+  // Extract only the numeric part of spark_item_id (handles full TikTok URLs or raw IDs)
+  let spark_item_id: string | null = null
+  if (body.spark_item_id && typeof body.spark_item_id === 'string') {
+    const match = body.spark_item_id.match(/(\d{15,20})/)
+    spark_item_id = match ? match[1] : null
+  }
+
   const { data, error } = await supabase
     .from('assets')
     .insert({
@@ -76,6 +83,7 @@ export async function POST(req: NextRequest) {
       notes:            body.notes ?? null,
       slack_message_ts: body.slack_message_ts ?? null,
       slack_channel_id: body.slack_channel_id ?? null,
+      spark_item_id,
     })
     .select()
     .single()
@@ -95,7 +103,7 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   // Whitelist updatable fields
-  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'first_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only', 'campaigns', 'freshness_state', 'freshness_detail', 'freshness_reason', 'freshness_scored_at', 'tiktok_campaign', 'tiktok_adgroup', 'tiktok_synced_at']
+  const allowed = ['stage', 'asset_name', 'content_type', 'file_name', 'status', 'date_added', 'date_live', 'first_live', 'posted_by', 'notes', 'product_id', 'performance', 'ad_only', 'campaigns', 'freshness_state', 'freshness_detail', 'freshness_reason', 'freshness_scored_at', 'tiktok_campaign', 'tiktok_adgroup', 'tiktok_synced_at', 'spark_item_id']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
