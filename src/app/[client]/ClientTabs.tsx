@@ -5,6 +5,7 @@ import type { Asset, AssetStatus, Product } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 import KanbanBoard from './KanbanBoard'
 import BriefPanel from './BriefPanel'
+import SparkAdsTab from './SparkAdsTab'
 import { STAGE_CONFIG, STATUS_CONFIG } from '@/lib/constants'
 import type { Stage } from '@/lib/supabase'
 
@@ -18,6 +19,7 @@ interface Props {
   products: Product[]
   campaigns: Campaign[]
   clientId: string
+  clientSlug: string
   briefSections: BriefSection[]
   missingCoverage: MissingItem[]
   initialStatus?: string | null
@@ -25,15 +27,19 @@ interface Props {
 
 const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 
-type Tab = 'board' | 'assets' | 'archive' | 'brief'
+type Tab = 'board' | 'assets' | 'archive' | 'brief' | 'spark'
 
-export default function ClientTabs({ assets, products, campaigns, clientId, briefSections, missingCoverage, initialStatus }: Props) {
+const isSpkAsset = (a: Asset) => a.asset_name.includes('-SPK-')
+
+export default function ClientTabs({ assets, products, campaigns, clientId, clientSlug, briefSections, missingCoverage, initialStatus }: Props) {
   const [tab, setTab]           = useState<Tab>('board')
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
   const [restoringId, setRestoringId] = useState<string | null>(null)
 
-  const activeAssets   = localAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
-  const archivedAssets = localAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
+  const nonSpkAssets   = localAssets.filter(a => !isSpkAsset(a))
+  const spkCount       = localAssets.filter(isSpkAsset).length
+  const activeAssets   = nonSpkAssets.filter(a => !ARCHIVE_STATUSES.includes(a.status))
+  const archivedAssets = nonSpkAssets.filter(a =>  ARCHIVE_STATUSES.includes(a.status))
 
   // Shared status-change handler — keeps all tabs in sync without a page reload.
   // Both KanbanBoard and AssetTable call this after a successful PATCH so that
@@ -100,6 +106,14 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
             Creator Brief
           </button>
         )}
+        <button className={tabCls(tab === 'spark')} onClick={() => setTab('spark')}>
+          ⚡ Spark Ads
+          {spkCount > 0 && (
+            <span className="ml-1.5 text-[10px] bg-stone-200 text-stone-500 px-1.5 py-0.5 rounded-full">
+              {spkCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Board tab — Kanban view */}
@@ -243,6 +257,9 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
 
       {/* Creator Brief tab */}
       {tab === 'brief' && <BriefPanel sections={briefSections} />}
+
+      {/* Spark Ads tab */}
+      {tab === 'spark' && <SparkAdsTab clientSlug={clientSlug} />}
     </div>
   )
 }
