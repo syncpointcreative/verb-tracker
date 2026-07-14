@@ -5,6 +5,7 @@ import type { Asset, AssetStatus, Product } from '@/lib/supabase'
 import AssetTable from './AssetTable'
 import KanbanBoard from './KanbanBoard'
 import BriefPanel from './BriefPanel'
+import SparkAdsTab from './SparkAdsTab'
 import { STAGE_CONFIG, STATUS_CONFIG } from '@/lib/constants'
 import type { Stage } from '@/lib/supabase'
 
@@ -26,9 +27,9 @@ interface Props {
 
 const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 
-type Tab = 'board' | 'assets' | 'archive' | 'brief'
+type Tab = 'board' | 'assets' | 'archive' | 'brief' | 'spark'
 
-export default function ClientTabs({ assets, products, campaigns, clientId, briefSections, missingCoverage, initialStatus }: Props) {
+export default function ClientTabs({ assets, products, campaigns, clientId, clientSlug, briefSections, missingCoverage, initialStatus }: Props) {
   const [tab, setTab]               = useState<Tab>('board')
   const [localAssets, setLocalAssets] = useState<Asset[]>(assets)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -100,6 +101,9 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
             Creator Brief
           </button>
         )}
+        <button className={tabCls(tab === 'spark')} onClick={() => setTab('spark')}>
+          ⚡ Spark Ads
+        </button>
       </div>
 
       {/* Board tab — Kanban view */}
@@ -243,6 +247,9 @@ export default function ClientTabs({ assets, products, campaigns, clientId, brie
 
       {/* Creator Brief tab */}
       {tab === 'brief' && <BriefPanel sections={briefSections} />}
+
+      {/* Spark Ads tab */}
+      {tab === 'spark' && <SparkAdsTab clientSlug={clientSlug} />}
     </div>
   )
 }
