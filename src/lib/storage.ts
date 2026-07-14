@@ -136,6 +136,19 @@ async function ensureGoogleSubfolder(token: string, parentId: string, name: stri
   return created.id
 }
 
+function monthFolderName(filename: string): string {
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  // Parse MMDDYY date suffix from filename (e.g. CHOMPS-SMK-AWA-LR-Hook-050626.mp4)
+  const m = filename.match(/[-_](\d{2})\d{2}(\d{2})(?:\.[^.]+)*$/)
+  if (m) {
+    const mm = parseInt(m[1], 10)
+    const yy = parseInt(m[2], 10)
+    if (mm >= 1 && mm <= 12) return `${MONTHS[mm - 1]} ${2000 + yy}`
+  }
+  const now = new Date()
+  return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`
+}
+
 async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: UploadInput): Promise<string> {
   const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID
   if (!rootFolderId) throw new Error('GOOGLE_DRIVE_FOLDER_ID not set')
@@ -143,9 +156,10 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: Uplo
   const token        = await getGoogleToken()
   const fileBuffer   = await downloadFromSlack(slackUrl)
   const clientFolder = await ensureGoogleSubfolder(token, rootFolderId, clientName)
+  const monthFolder  = await ensureGoogleSubfolder(token, clientFolder, monthFolderName(fileName))
 
   const boundary = '-------storageupload'
-  const metadata = JSON.stringify({ name: fileName, parents: [clientFolder] })
+  const metadata = JSON.stringify({ name: fileName, parents: [monthFolder] })
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
     fileBuffer,

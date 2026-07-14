@@ -22,7 +22,7 @@ interface Props {
 function getFreshness(asset: Asset): { days: number } | 'not-live' | 'paused' | null {
   if (['Pulled', 'Removed by Request', 'Pending Review'].includes(asset.status)) return null
   if (asset.status === 'Paused') return 'paused'
-  if (!asset.date_live) return 'not-live'
+  if (!asset.date_live) return asset.status === 'Live / Running' ? null : 'not-live'
   const days = daysLive(asset.date_live)
   return { days }
 }
