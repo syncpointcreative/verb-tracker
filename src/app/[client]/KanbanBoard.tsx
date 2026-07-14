@@ -501,15 +501,29 @@ function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApproval
         </div>
       </div>
 
-      {/* Row 2: Asset name */}
-      <button
-        onClick={() => onPreview(asset)}
-        className="text-left font-serif text-base font-light text-[#3b2b52] leading-snug mb-1.5 hover:text-[#d4865e] transition-colors w-full group/name"
-        title="Click to preview"
-      >
-        {asset.asset_name || '—'}
-        <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1.5 align-middle transition-opacity">▶</span>
-      </button>
+      {/* Row 2: Asset name + optional TikTok link for Spark assets */}
+      <div className="mb-1.5">
+        <button
+          onClick={() => onPreview(asset)}
+          className="text-left font-serif text-base font-light text-[#3b2b52] leading-snug hover:text-[#d4865e] transition-colors w-full group/name"
+          title="Click to preview"
+        >
+          {asset.asset_name || '—'}
+          <span className="opacity-0 group-hover/name:opacity-40 text-[10px] ml-1.5 align-middle transition-opacity">▶</span>
+        </button>
+        {asset.spark_item_id && (
+          <a
+            href={`https://www.tiktok.com/video/${asset.spark_item_id}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-[10px] text-stone-400 hover:text-[#d4865e] transition-colors mt-0.5"
+            title="View on TikTok"
+          >
+            ⚡ TikTok ↗
+          </a>
+        )}
+      </div>
 
       {/* Row 3: Campaign tags */}
       <div className="relative flex items-center gap-1 flex-wrap mb-2">
