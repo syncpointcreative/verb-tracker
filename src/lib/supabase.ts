@@ -70,6 +70,18 @@ export type SparkAd = {
   adgroup_name: string | null
   ad_status: string | null
   synced_at: string | null
+  stage: string | null
+  freshness_state: string | null   // still_performing | underperforming | needs_replacing | under_delivered
+  freshness_reason: string | null  // never_performed | faded | aged_out
+  spend: number | null
+  impressions: number | null
+  roas: number | null
+  ctr: number | null
+  cpc: number | null
+  cpm: number | null
+  watch_rate: number | null
+  follows: number | null
+  likes: number | null
 }
 
 // Browser client (uses anon key — respects RLS)
