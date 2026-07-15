@@ -209,18 +209,30 @@ function SparkAdCard({ ad, onArchive }: { ad: SparkAd; onArchive: (id: string) =
         <p className="text-[10px] text-stone-400 truncate" title={ad.adgroup_name}>{ad.adgroup_name}</p>
       )}
 
-      {/* TikTok video ID — copy to find in Ads Manager or TikTok search */}
+      {/* TikTok video link or fallback copy ID */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-stone-400 font-mono truncate flex-1" title={ad.tiktok_item_id}>
-          {ad.tiktok_item_id}
-        </span>
-        <button
-          onClick={() => navigator.clipboard.writeText(ad.tiktok_item_id)}
-          title="Copy TikTok video ID"
-          className="text-[10px] text-stone-400 hover:text-[#d4865e] transition-colors flex-shrink-0 border border-stone-200 rounded px-1.5 py-0.5"
-        >
-          Copy ID
-        </button>
+        {ad.creator_name && (
+          <span className="text-[10px] text-stone-400 truncate flex-1">@{ad.creator_name}</span>
+        )}
+        {ad.video_url ? (
+          <a
+            href={ad.video_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open on TikTok"
+            className="text-[10px] text-[#d4865e] hover:underline flex-shrink-0 border border-[#d4865e]/30 rounded px-1.5 py-0.5"
+          >
+            View ↗
+          </a>
+        ) : (
+          <button
+            onClick={() => navigator.clipboard.writeText(ad.tiktok_item_id)}
+            title="Copy TikTok video ID"
+            className="text-[10px] text-stone-400 hover:text-[#d4865e] transition-colors flex-shrink-0 border border-stone-200 rounded px-1.5 py-0.5"
+          >
+            Copy ID
+          </button>
+        )}
       </div>
 
       {/* Auth code */}
