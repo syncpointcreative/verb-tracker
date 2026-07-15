@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { SparkAd } from '@/lib/supabase'
+import { freshnessVerdict } from '@/lib/freshness'
 
 type StatusFilter = 'all' | 'active' | 'paused'
 
@@ -12,23 +13,72 @@ interface Props {
 function StatusBadge({ adStatus }: { adStatus: string | null }) {
   const isActive = adStatus === 'AD_STATUS_DELIVERY_OK'
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-        isActive
-          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          : 'bg-stone-100 text-stone-500 border border-stone-200'
-      }`}
-    >
+    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+      isActive
+        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+        : 'bg-stone-100 text-stone-500 border border-stone-200'
+    }`}>
       {isActive ? '🟢' : '⏸'} {isActive ? 'Active' : 'Paused'}
     </span>
   )
 }
 
+function FreshnessPill({ state, reason }: { state: string | null; reason: string | null }) {
+  const verdict = freshnessVerdict(state, reason)
+  if (!verdict) return null
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${verdict.cls}`}
+      title={verdict.hint ?? undefined}
+    >
+      {verdict.emoji} {verdict.label}
+    </span>
+  )
+}
+
+function StageBadge({ stage }: { stage: string | null }) {
+  if (!stage) return null
+  const cls =
+    stage === 'Awareness'             ? 'text-rose-600 bg-rose-50 border-rose-200' :
+    stage === 'Consideration'         ? 'text-amber-600 bg-amber-50 border-amber-200' :
+    stage === 'Conversion'            ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+    stage === 'Community Interaction' ? 'text-sky-600 bg-sky-50 border-sky-200' :
+    'text-stone-500 bg-stone-100 border-stone-200'
+  return (
+    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${cls}`}>
+      {stage}
+    </span>
+  )
+}
+
+function KeyMetric({ ad }: { ad: SparkAd }) {
+  const stage = ad.stage
+  if (!stage || ad.spend == null || ad.spend < 1) return null
+
+  let label: string, value: string
+  if (stage === 'Conversion') {
+    label = 'ROAS'; value = ad.roas != null ? `${ad.roas.toFixed(2)}x` : '—'
+  } else if (stage === 'Awareness') {
+    label = 'Watch'; value = ad.watch_rate != null ? `${ad.watch_rate.toFixed(1)}%` : '—'
+  } else if (stage === 'Consideration') {
+    label = 'CTR'; value = ad.ctr != null ? `${ad.ctr.toFixed(2)}%` : '—'
+  } else {
+    const eng = (ad.follows ?? 0) + (ad.likes ?? 0)
+    label = 'Eng.'; value = eng > 0 ? eng.toLocaleString() : '—'
+  }
+
+  return (
+    <span className="text-[10px] px-2 py-0.5 rounded-full border text-stone-600 bg-stone-50 border-stone-200">
+      {label} {value}
+    </span>
+  )
+}
+
 export default function SparkAdsTab({ clientSlug }: Props) {
-  const [items, setItems]         = useState<SparkAd[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string | null>(null)
-  const [filter, setFilter]       = useState<StatusFilter>('all')
+  const [items, setItems]     = useState<SparkAd[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+  const [filter, setFilter]   = useState<StatusFilter>('all')
 
   useEffect(() => {
     fetch(`/api/spark-ads?client_slug=${encodeURIComponent(clientSlug)}`)
@@ -49,7 +99,6 @@ export default function SparkAdsTab({ clientSlug }: Props) {
   if (loading) return (
     <div className="flex items-center justify-center py-16 text-stone-400 text-sm">Loading Spark Ads…</div>
   )
-
   if (error) return (
     <div className="py-10 text-center text-red-400 text-sm">Error: {error}</div>
   )
@@ -63,7 +112,6 @@ export default function SparkAdsTab({ clientSlug }: Props) {
     ? items.filter(a => a.ad_status !== 'AD_STATUS_DELIVERY_OK')
     : items
 
-  // Group by campaign_name
   const groups = visible.reduce<Record<string, SparkAd[]>>((acc, ad) => {
     const key = ad.campaign_name ?? '(No Campaign)'
     if (!acc[key]) acc[key] = []
@@ -87,11 +135,10 @@ export default function SparkAdsTab({ clientSlug }: Props) {
 
   return (
     <div>
-      {/* Filter bar */}
       <div className="flex items-center gap-1.5 flex-wrap mb-6">
-        {filterBtn('all',    'All',    items.length)}
+        {filterBtn('all',    'All',       items.length)}
         {filterBtn('active', '🟢 Active', activeCount)}
-        {filterBtn('paused', '⏸ Paused', pausedCount)}
+        {filterBtn('paused', '⏸ Paused',  pausedCount)}
       </div>
 
       {visible.length === 0 ? (
@@ -123,13 +170,18 @@ export default function SparkAdsTab({ clientSlug }: Props) {
 
 function SparkAdCard({ ad, onArchive }: { ad: SparkAd; onArchive: (id: string) => void }) {
   const [authCode, setAuthCode] = useState('')
+  const isActive = ad.ad_status === 'AD_STATUS_DELIVERY_OK'
 
   const title = ad.ad_name
     ? ad.ad_name.length > 80 ? ad.ad_name.slice(0, 77) + '…' : ad.ad_name
     : '(Untitled)'
 
   return (
-    <div className="bg-white border border-stone-200 rounded-lg p-4 flex flex-col gap-3 hover:border-stone-300 transition-colors">
+    <div className={`border rounded-lg p-4 flex flex-col gap-3 transition-colors ${
+      isActive
+        ? 'bg-white border-stone-200 hover:border-stone-300'
+        : 'bg-stone-50 border-stone-100 hover:border-stone-200'
+    }`}>
       {/* Title + archive */}
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-stone-700 font-medium leading-snug flex-1" title={ad.ad_name ?? undefined}>
@@ -137,38 +189,41 @@ function SparkAdCard({ ad, onArchive }: { ad: SparkAd; onArchive: (id: string) =
         </p>
         <button
           onClick={() => onArchive(ad.id)}
-          title="Archive this entry"
+          title="Remove this entry"
           className="text-stone-300 hover:text-red-400 transition-colors text-xs flex-shrink-0 mt-0.5"
-        >
-          ✕
-        </button>
+        >✕</button>
       </div>
 
-      {/* Status + adgroup */}
+      {/* Status + stage + performance pill */}
       <div className="flex items-center gap-2 flex-wrap">
         <StatusBadge adStatus={ad.ad_status} />
-        {ad.adgroup_name && (
-          <span className="text-[10px] text-stone-400 truncate max-w-[180px]" title={ad.adgroup_name}>
-            {ad.adgroup_name}
-          </span>
-        )}
+        <StageBadge stage={ad.stage} />
+        {isActive
+          ? <KeyMetric ad={ad} />
+          : <FreshnessPill state={ad.freshness_state} reason={ad.freshness_reason} />
+        }
       </div>
 
-      {/* TikTok link */}
+      {/* Ad group */}
+      {ad.adgroup_name && (
+        <p className="text-[10px] text-stone-400 truncate" title={ad.adgroup_name}>{ad.adgroup_name}</p>
+      )}
+
+      {/* TikTok link — requires TikTok login to resolve */}
       <a
         href={`https://www.tiktok.com/video/${ad.tiktok_item_id}`}
         target="_blank"
         rel="noreferrer"
-        className="text-[10px] text-[#d4865e] hover:text-[#e0a07d] font-mono tracking-wide underline underline-offset-2 transition-colors"
+        className="text-[10px] text-[#d4865e] hover:text-[#e0a07d] transition-colors"
+        title="Opens on TikTok (requires TikTok login)"
       >
         ⚡ View on TikTok ↗
+        <span className="text-stone-300 ml-1 font-mono">{ad.tiktok_item_id}</span>
       </a>
 
       {/* Auth code */}
       <div>
-        <label className="block text-[10px] text-stone-400 uppercase tracking-[0.12em] mb-1">
-          Auth Code
-        </label>
+        <label className="block text-[10px] text-stone-400 uppercase tracking-[0.12em] mb-1">Auth Code</label>
         <input
           type="text"
           value={authCode}
