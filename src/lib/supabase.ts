@@ -82,6 +82,8 @@ export type SparkAd = {
   watch_rate: number | null
   follows: number | null
   likes: number | null
+  creator_name: string | null
+  video_url: string | null
 }
 
 // Browser client (uses anon key — respects RLS)
