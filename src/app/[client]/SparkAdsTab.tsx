@@ -209,17 +209,19 @@ function SparkAdCard({ ad, onArchive }: { ad: SparkAd; onArchive: (id: string) =
         <p className="text-[10px] text-stone-400 truncate" title={ad.adgroup_name}>{ad.adgroup_name}</p>
       )}
 
-      {/* TikTok link — requires TikTok login to resolve */}
-      <a
-        href={`https://www.tiktok.com/video/${ad.tiktok_item_id}`}
-        target="_blank"
-        rel="noreferrer"
-        className="text-[10px] text-[#d4865e] hover:text-[#e0a07d] transition-colors"
-        title="Opens on TikTok (requires TikTok login)"
-      >
-        ⚡ View on TikTok ↗
-        <span className="text-stone-300 ml-1 font-mono">{ad.tiktok_item_id}</span>
-      </a>
+      {/* TikTok video ID — copy to find in Ads Manager or TikTok search */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-stone-400 font-mono truncate flex-1" title={ad.tiktok_item_id}>
+          {ad.tiktok_item_id}
+        </span>
+        <button
+          onClick={() => navigator.clipboard.writeText(ad.tiktok_item_id)}
+          title="Copy TikTok video ID"
+          className="text-[10px] text-stone-400 hover:text-[#d4865e] transition-colors flex-shrink-0 border border-stone-200 rounded px-1.5 py-0.5"
+        >
+          Copy ID
+        </button>
+      </div>
 
       {/* Auth code */}
       <div>
