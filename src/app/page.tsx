@@ -98,14 +98,14 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   }
 
   const [{ data: assets }, { data: deliveries }] = await Promise.all([
-    supabase.from('assets').select('client_id, date_added, date_live, status, content_type, freshness_state, freshness_reason')
+    supabase.from('assets').select('client_id, date_added, date_live, status, content_type, freshness_state, freshness_reason, asset_name, spark_item_id')
       .in('client_id', clients.map(c => c.id)),
     supabase.from('monthly_deliveries').select('*')
       .in('client_id', clients.map(c => c.id))
       .in('month', Array.from(allPeriodStarts)).order('month'),
   ])
 
-  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type' | 'freshness_state' | 'freshness_reason'>[]> = {}
+  const assetsByClient: Record<string, Pick<Asset, 'client_id' | 'date_added' | 'date_live' | 'status' | 'content_type' | 'freshness_state' | 'freshness_reason' | 'asset_name' | 'spark_item_id'>[]> = {}
   for (const a of (assets ?? [])) {
     if (!assetsByClient[a.client_id]) assetsByClient[a.client_id] = []
     assetsByClient[a.client_id].push(a)
@@ -118,7 +118,11 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
   }
 
   return clients.map(client => {
-    const clientAssets = assetsByClient[client.id] ?? []
+    const allAssets = assetsByClient[client.id] ?? []
+    // Spark Ads and EXT-titled assets are brand/external content — exclude from team content counts.
+    const isBrandContent = (a: typeof allAssets[0]) =>
+      !!a.spark_item_id || (a.asset_name ?? '').toUpperCase().includes('EXT')
+    const clientAssets = allAssets.filter(a => !isBrandContent(a))
     const { currentStart, nextStart, billingDay } = clientPeriods.get(client.id)!
     const freshness: FreshnessCounts = { still_performing: 0, underperforming: 0, needs_replacing: 0, under_delivered: 0 }
     const contentTypeCounts: Record<string, number> = {}
