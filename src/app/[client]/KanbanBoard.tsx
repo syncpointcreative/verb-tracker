@@ -676,11 +676,12 @@ function isUnderperforming(asset: Asset): boolean {
   return asset.freshness_state === 'underperforming'
 }
 
-// spark_item_id is canonical; fall back to name patterns for SPK-coded and EXT (external creator) assets.
+// spark_item_id is canonical; -SPK- naming is a secondary signal for boosted organic posts.
+// EXT means "external creator" across all clients — not a Spark signal.
 function isSparkAsset(asset: Asset): boolean {
   if (asset.spark_item_id) return true
   const name = (asset.asset_name ?? '').toUpperCase()
-  return name.includes('-SPK-') || name.includes('EXT')
+  return name.includes('-SPK-')
 }
 
 function FilterBar({
