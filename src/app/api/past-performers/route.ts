@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
       name:               a.asset_name,
       stage:              a.stage,
       status:             a.status,
-      product_name:       (a.product as { name: string } | null)?.name ?? null,
+      product_name:       (Array.isArray(a.product) ? a.product[0] : a.product as { name: string } | null)?.name ?? null,
       freshness_state:    a.freshness_state,
       freshness_reason:   a.freshness_reason,
       freshness_detail:   a.freshness_detail,
