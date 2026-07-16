@@ -492,7 +492,7 @@ function AssetCard({ asset, campaigns, onStatusChange, onPullRequest, onApproval
           )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {asset.ad_only && (
+          {(asset.ad_only || isSparkAsset(asset)) && (
             <span className="text-[9px] font-semibold tracking-wide text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5 uppercase">
               Ads Only
             </span>
@@ -676,10 +676,11 @@ function isUnderperforming(asset: Asset): boolean {
   return asset.freshness_state === 'underperforming'
 }
 
-// spark_item_id is the canonical indicator — name-based detection misses assets
-// that were sparked without an SPK code in the name.
+// spark_item_id is canonical; fall back to name patterns for SPK-coded and EXT (external creator) assets.
 function isSparkAsset(asset: Asset): boolean {
-  return !!asset.spark_item_id
+  if (asset.spark_item_id) return true
+  const name = (asset.asset_name ?? '').toUpperCase()
+  return name.includes('-SPK-') || name.includes('EXT')
 }
 
 function FilterBar({
