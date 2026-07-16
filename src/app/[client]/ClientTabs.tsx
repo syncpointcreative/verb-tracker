@@ -6,6 +6,7 @@ import AssetTable from './AssetTable'
 import KanbanBoard from './KanbanBoard'
 import BriefPanel from './BriefPanel'
 import SparkAdsTab from './SparkAdsTab'
+import PastPerformersTab from './PastPerformersTab'
 import { STAGE_CONFIG, STATUS_CONFIG } from '@/lib/constants'
 import type { Stage } from '@/lib/supabase'
 
@@ -27,7 +28,7 @@ interface Props {
 
 const ARCHIVE_STATUSES = ['Pulled', 'Removed by Request']
 
-type Tab = 'board' | 'assets' | 'archive' | 'brief' | 'spark'
+type Tab = 'board' | 'assets' | 'archive' | 'brief' | 'spark' | 'past'
 
 export default function ClientTabs({ assets, products, campaigns, clientId, clientSlug, briefSections, missingCoverage, initialStatus }: Props) {
   const [tab, setTab]               = useState<Tab>('board')
@@ -103,6 +104,9 @@ export default function ClientTabs({ assets, products, campaigns, clientId, clie
         )}
         <button className={tabCls(tab === 'spark')} onClick={() => setTab('spark')}>
           ⚡ Spark Ads
+        </button>
+        <button className={tabCls(tab === 'past')} onClick={() => setTab('past')}>
+          📈 Past Performers
         </button>
       </div>
 
@@ -250,6 +254,9 @@ export default function ClientTabs({ assets, products, campaigns, clientId, clie
 
       {/* Spark Ads tab */}
       {tab === 'spark' && <SparkAdsTab clientSlug={clientSlug} />}
+
+      {/* Past Performers tab */}
+      {tab === 'past' && <PastPerformersTab clientSlug={clientSlug} />}
     </div>
   )
 }
