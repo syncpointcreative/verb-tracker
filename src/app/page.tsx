@@ -130,19 +130,24 @@ async function getClientSummaries(): Promise<ClientSummary[]> {
     // needs_replacing splits by reason into its two plays (📉 Replace vs 💀 Kill).
     let faded = 0, kill = 0
 
+    // Freshness health chips include ALL assets (EXT + Spark too) — clients like ESW
+    // that run only external creatives should still show live performance status.
+    for (const asset of allAssets) {
+      if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
+      const state = asset.freshness_state as FreshnessState | null
+      if (state && state in freshness) freshness[state]++
+      if (state === 'needs_replacing') { if (asset.freshness_reason === 'faded') faded++; else kill++ }
+    }
+
+    // Workflow and content-type counts are team-produced assets only.
     for (const asset of clientAssets) {
       if (asset.status === 'Pending Review')          pendingReview++
       if (asset.status === 'Ready to Upload')         readyToUpload++
       if (asset.status === 'Needs Refresh / Missing') needsRefresh++
-      if (asset.status === 'Pulled' || asset.status === 'Removed by Request') continue
-      // Health chips reflect the analyzer's performance verdict (live, scored assets only).
-      const state = asset.freshness_state as FreshnessState | null
-      if (state && state in freshness) freshness[state]++
-      if (state === 'needs_replacing') { if (asset.freshness_reason === 'faded') faded++; else kill++ }
       if (asset.content_type) contentTypeCounts[asset.content_type] = (contentTypeCounts[asset.content_type] ?? 0) + 1
     }
 
-    return { client, totalAssets: clientAssets.length, freshness, faded, kill, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, needsReplacing: freshness.needs_replacing }
+    return { client, totalAssets: allAssets.length, freshness, faded, kill, contentTypeCounts, deliveries: deliveriesByClient[client.id] ?? [], currentStart, nextStart, billingDay, pendingReview, readyToUpload, needsRefresh, needsReplacing: freshness.needs_replacing }
   })
 }
 
