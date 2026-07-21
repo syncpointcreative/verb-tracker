@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       product:products(name)
     `)
     .is('monday_item_id', null)
+    .not('slack_message_ts', 'is', null)
     .gte('date_added', since)
     .order('date_added', { ascending: true })
 
