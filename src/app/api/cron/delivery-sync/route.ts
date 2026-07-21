@@ -20,7 +20,10 @@ import { refreshDeliveredCount } from '@/lib/deliveries'
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const apiKey     = req.headers.get('x-api-key')
+  const validCron  = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  const validApi   = apiKey === process.env.AUTH_API_KEY
+  if (!validCron && !validApi) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
