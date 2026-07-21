@@ -109,6 +109,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
   // Junkless
   PBVP: 'Protein Bar Variety Pack',
+  GBVP: 'Granola Bar Variety Pack',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
