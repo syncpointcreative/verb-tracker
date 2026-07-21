@@ -45,18 +45,6 @@ function itemName(asset: AssetRow): string {
   return creator ? `${creator} — ${title}` : title
 }
 
-/** Pick the best target group: prefer a month-named group over "📥 Incoming Assets". */
-function selectGroupId(
-  groups: Array<{ id: string; title: string }>,
-  dateAdded: string | null,
-): string | null {
-  if (!dateAdded) return null
-  const d = new Date(dateAdded)
-  const monthName = d.toLocaleString('en-US', { month: 'long' }).toUpperCase()
-  const year = d.getFullYear()
-  const target = `${monthName} ${year}`
-  return groups.find(g => g.title === target)?.id ?? null
-}
 
 export async function POST(req: NextRequest) {
   if (!process.env.MONDAY_API_TOKEN) {
@@ -124,9 +112,8 @@ export async function POST(req: NextRequest) {
 
   for (const asset of rows) {
     const name = itemName(asset)
-    const monthGroupId = selectGroupId(board.groups, asset.date_added)
-    const groupId = monthGroupId ?? incomingGroupId
-    const groupTitle = board.groups.find(g => g.id === groupId)?.title ?? '📥 Incoming Assets'
+    const groupId = incomingGroupId
+    const groupTitle = '📥 Incoming Assets'
 
     if (!apply) {
       plan.push({ assetId: asset.id, name, group: groupTitle, dateAdded: asset.date_added, status: asset.status })
