@@ -77,6 +77,8 @@ async function countDeliverables(
     .select('id', { count: 'exact', head: true })
     .eq('client_id', clientId)
     .eq('ad_only', false)
+    .is('spark_item_id', null)
+    .not('asset_name', 'ilike', '%-EXT-%')
     .gte('date_added', periodStart)
     .lt('date_added', periodEnd)
   return count ?? 0
@@ -112,6 +114,8 @@ export async function refreshDeliveredCount(
       .select('date_added')
       .eq('client_id', clientId)
       .eq('ad_only', false)
+      .is('spark_item_id', null)
+      .not('asset_name', 'ilike', '%-EXT-%')
       .not('date_added', 'is', null)
       .order('date_added', { ascending: true })
       .limit(1)
