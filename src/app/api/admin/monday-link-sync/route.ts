@@ -10,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { findBoardByName, updateItemLinkColumn } from '@/lib/monday'
+import { findBoardByName, updateItemLinkColumn, mondayQuery } from '@/lib/monday'
 
 export const maxDuration = 300
 
@@ -57,9 +57,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `No Monday board found for "${clientSlug}"` }, { status: 404 })
   }
 
-  const linkCol = board.columns.find(c => c.type === 'link')
+  let linkCol = board.columns.find(c => c.type === 'link')
   if (!linkCol) {
-    return NextResponse.json({ error: 'No link column found on board' }, { status: 404 })
+    if (!apply) {
+      return NextResponse.json({
+        mode: 'dry-run', clientSlug, found: rows.length,
+        warning: 'No link column on board — run with ?apply=1 to create it automatically',
+      })
+    }
+    // Create the link column on the board
+    const created = await mondayQuery<{ create_column: { id: string; title: string } }>(`
+      mutation($boardId: ID!, $title: String!, $colType: ColumnType!) {
+        create_column(board_id: $boardId, title: $title, column_type: $colType) { id title }
+      }
+    `, { boardId: board.id, title: 'Link', colType: 'link' })
+    linkCol = { id: created.create_column.id, title: created.create_column.title, type: 'link' }
   }
 
   const results: Array<{ assetId: string; mondayItemId: string; assetName: string | null; updated: boolean; error?: string }> = []
