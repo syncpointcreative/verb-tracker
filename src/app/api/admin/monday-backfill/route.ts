@@ -54,8 +54,6 @@ function itemName(asset: AssetRow): string {
   return creator ? `${creator} — ${title}` : title
 }
 
-<<<<<<< HEAD
-=======
 /** Fetch current group ids for a list of Monday item ids (in chunks of 100). */
 async function fetchItemGroups(ids: string[]): Promise<Map<string, string>> {
   const result = new Map<string, string>()
@@ -71,7 +69,6 @@ async function fetchItemGroups(ids: string[]): Promise<Map<string, string>> {
   }
   return result
 }
->>>>>>> f11bba9 (Fix Monday group assignment: always use Incoming Assets, not month groups)
 
 export async function POST(req: NextRequest) {
   if (!process.env.MONDAY_API_TOKEN) {
