@@ -210,6 +210,17 @@ export async function createContentItem(params: CreateContentItemParams): Promis
   return data.create_item.id
 }
 
+// ── Item moves ────────────────────────────────────────────────────────────────
+
+/** Move an item to a different group on the same board. */
+export async function moveItemToGroup(itemId: string, groupId: string): Promise<void> {
+  await mondayQuery<{ move_item_to_group: { id: string } }>(`
+    mutation($itemId: ID!, $groupId: String!) {
+      move_item_to_group(item_id: $itemId, group_id: $groupId) { id }
+    }
+  `, { itemId, groupId })
+}
+
 // ── Item updates ──────────────────────────────────────────────────────────────
 
 /**

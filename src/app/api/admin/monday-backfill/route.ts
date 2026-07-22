@@ -1,4 +1,4 @@
-// v2
+// v3
 /**
  * POST /api/admin/monday-backfill
  *
@@ -10,9 +10,11 @@
  * Dry-run by default; pass ?apply=1 to commit.
  *
  * Query params:
- *   ?apply=1         — write Monday items + update DB (default: dry-run)
- *   ?client=junkless — client slug to backfill (default: junkless)
- *   ?since=2026-07-14 — only assets on or after this date (default: 30 days ago)
+ *   ?apply=1           — write Monday items + update DB (default: dry-run)
+ *   ?client=junkless   — client slug to backfill (default: junkless)
+ *   ?since=2026-07-14  — only assets on or after this date (default: 30 days ago)
+ *   ?move-groups=1     — move existing items out of month groups into "📥 Incoming Assets"
+ *                        (applies to assets that already have a monday_item_id)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
@@ -22,6 +24,8 @@ import {
   findOrCreateIncomingGroup,
   findUserByName,
   createContentItem,
+  moveItemToGroup,
+  mondayQuery,
 } from '@/lib/monday'
 
 interface AssetRow {
@@ -37,6 +41,11 @@ interface AssetRow {
   product:        { name: string } | null
 }
 
+interface AssetWithMonday {
+  id:             string
+  monday_item_id: string
+}
+
 /** Format item name as "Creator — Title" to match new-submission convention. */
 function itemName(asset: AssetRow): string {
   const parsed  = asset.file_name ? parseFilename(asset.file_name) : null
@@ -45,6 +54,24 @@ function itemName(asset: AssetRow): string {
   return creator ? `${creator} — ${title}` : title
 }
 
+<<<<<<< HEAD
+=======
+/** Fetch current group ids for a list of Monday item ids (in chunks of 100). */
+async function fetchItemGroups(ids: string[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>()
+  const CHUNK = 100
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const data = await mondayQuery<{ items: Array<{ id: string; group: { id: string } | null }> }>(`
+      query($ids: [ID!], $limit: Int!) { items(ids: $ids, limit: $limit) { id group { id } } }
+    `, { ids: chunk, limit: chunk.length })
+    for (const it of data.items ?? []) {
+      if (it.group?.id) result.set(it.id, it.group.id)
+    }
+  }
+  return result
+}
+>>>>>>> f11bba9 (Fix Monday group assignment: always use Incoming Assets, not month groups)
 
 export async function POST(req: NextRequest) {
   if (!process.env.MONDAY_API_TOKEN) {
@@ -53,6 +80,7 @@ export async function POST(req: NextRequest) {
 
   const apply      = req.nextUrl.searchParams.get('apply') === '1'
   const clientSlug = req.nextUrl.searchParams.get('client') ?? 'junkless'
+  const moveGroups = req.nextUrl.searchParams.get('move-groups') === '1'
 
   const defaultSince = new Date()
   defaultSince.setDate(defaultSince.getDate() - 30)
@@ -60,7 +88,78 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  // Fetch assets missing a Monday card for the target client
+  // Look up the Monday board once (needed for both modes)
+  const board = await findBoardByName(clientSlug)
+  if (!board) {
+    return NextResponse.json({ error: `No Monday board found for client "${clientSlug}"` }, { status: 404 })
+  }
+
+  const incomingGroupId = apply || moveGroups
+    ? await findOrCreateIncomingGroup(board.id)
+    : (board.groups.find(g => g.title === '📥 Incoming Assets')?.id ?? 'incoming-placeholder')
+
+  // ── Move-groups mode: fix items already on Monday that landed in a month group ──
+  if (moveGroups) {
+    const { data: existing } = await supabase
+      .from('assets')
+      .select('id, monday_item_id')
+      .not('monday_item_id', 'is', null)
+
+    const rows = ((existing ?? []) as unknown as AssetWithMonday[])
+    // We need to filter to this client — fetch client_id for the slug first
+    const { data: clientRow } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('slug', clientSlug)
+      .maybeSingle()
+
+    const clientId = (clientRow as { id: string } | null)?.id
+    const { data: clientAssets } = clientId
+      ? await supabase.from('assets').select('id, monday_item_id').eq('client_id', clientId).not('monday_item_id', 'is', null)
+      : { data: [] }
+
+    const clientRows = ((clientAssets ?? []) as unknown as AssetWithMonday[])
+    const itemIds    = clientRows.map(r => r.monday_item_id)
+
+    if (!itemIds.length) {
+      return NextResponse.json({ mode: 'move-groups', clientSlug, found: 0, message: 'No Monday items found for client.' })
+    }
+
+    const currentGroups = await fetchItemGroups(itemIds)
+
+    const toMove = clientRows.filter(r => {
+      const gid = currentGroups.get(r.monday_item_id)
+      return gid && gid !== incomingGroupId
+    })
+
+    const moveResult: Array<{ mondayItemId: string; fromGroup: string; moved: boolean; error?: string }> = []
+
+    for (const row of toMove) {
+      const fromGroup = currentGroups.get(row.monday_item_id) ?? 'unknown'
+      if (!apply) {
+        moveResult.push({ mondayItemId: row.monday_item_id, fromGroup, moved: false })
+        continue
+      }
+      try {
+        await moveItemToGroup(row.monday_item_id, incomingGroupId)
+        moveResult.push({ mondayItemId: row.monday_item_id, fromGroup, moved: true })
+      } catch (err) {
+        moveResult.push({ mondayItemId: row.monday_item_id, fromGroup, moved: false, error: String(err) })
+      }
+    }
+
+    return NextResponse.json({
+      mode:          apply ? 'move-groups:apply' : 'move-groups:dry-run',
+      clientSlug,
+      totalItems:    itemIds.length,
+      needsMove:     toMove.length,
+      moved:         moveResult.filter(r => r.moved).length,
+      items:         moveResult,
+    })
+  }
+
+  // ── Standard backfill mode ────────────────────────────────────────────────────
+
   const { data: assets, error } = await supabase
     .from('assets')
     .select(`
@@ -75,7 +174,6 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Filter to the target client (Supabase foreign-table filter doesn't support eq on joined tables easily)
   const rows = ((assets ?? []) as unknown as AssetRow[]).filter(
     a => a.client?.slug === clientSlug
   )
@@ -83,17 +181,6 @@ export async function POST(req: NextRequest) {
   if (!rows.length) {
     return NextResponse.json({ mode: apply ? 'apply' : 'dry-run', clientSlug, since, found: 0, message: 'No assets to backfill.' })
   }
-
-  // Look up the Monday board once
-  const board = await findBoardByName(clientSlug)
-  if (!board) {
-    return NextResponse.json({ error: `No Monday board found for client "${clientSlug}"` }, { status: 404 })
-  }
-
-  // Ensure "📥 Incoming Assets" group exists (fallback when no month group matches)
-  const incomingGroupId = apply
-    ? await findOrCreateIncomingGroup(board.id)
-    : (board.groups.find(g => g.title === '📥 Incoming Assets')?.id ?? 'incoming-placeholder')
 
   // Find people (assignee) column
   const peopleCol = board.columns.find(c => c.type === 'people')
@@ -113,21 +200,18 @@ export async function POST(req: NextRequest) {
 
   for (const asset of rows) {
     const name = itemName(asset)
-    const groupId = incomingGroupId
-    const groupTitle = '📥 Incoming Assets'
 
     if (!apply) {
-      plan.push({ assetId: asset.id, name, group: groupTitle, dateAdded: asset.date_added, status: asset.status })
+      plan.push({ assetId: asset.id, name, group: '📥 Incoming Assets', dateAdded: asset.date_added, status: asset.status })
       continue
     }
 
-    // Determine link (Drive URL preferred, fall back to nothing)
     const linkUrl = asset.drive_url ?? undefined
 
     try {
       const mondayItemId = await createContentItem({
         boardId:     board.id,
-        groupId,
+        groupId:     incomingGroupId,
         itemName:    name,
         assigneeId:  libby?.id,
         peopleColId: peopleCol?.id,
@@ -136,20 +220,19 @@ export async function POST(req: NextRequest) {
         linkColId:   board.columns.find(c => c.type === 'link')?.id,
       })
 
-      // Write monday_item_id back to the DB
       await supabase
         .from('assets')
         .update({ monday_item_id: mondayItemId })
         .eq('id', asset.id)
 
-      plan.push({ assetId: asset.id, name, group: groupTitle, dateAdded: asset.date_added, status: asset.status, mondayItemId })
+      plan.push({ assetId: asset.id, name, group: '📥 Incoming Assets', dateAdded: asset.date_added, status: asset.status, mondayItemId })
     } catch (err) {
-      plan.push({ assetId: asset.id, name, group: groupTitle, dateAdded: asset.date_added, status: asset.status, error: String(err) })
+      plan.push({ assetId: asset.id, name, group: '📥 Incoming Assets', dateAdded: asset.date_added, status: asset.status, error: String(err) })
     }
   }
 
-  const created  = plan.filter(p => p.mondayItemId).length
-  const errored  = plan.filter(p => p.error).length
+  const created = plan.filter(p => p.mondayItemId).length
+  const errored = plan.filter(p => p.error).length
 
   return NextResponse.json({
     mode:       apply ? 'apply' : 'dry-run',

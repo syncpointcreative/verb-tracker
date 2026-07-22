@@ -32,9 +32,9 @@ import { uploadFile } from '@/lib/storage'
 import { findBoardByName, updateItemLinkColumn } from '@/lib/monday'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
-// Give the function the full Hobby-plan budget — large video uploads can't finish
-// in the default 10s, which was killing the run mid-upload (500s + stuck items).
-export const maxDuration = 60
+// 300s requires Vercel Pro; Hobby plan caps at 60s regardless of this value.
+// Set to 300 so large video uploads don't time out on Pro.
+export const maxDuration = 300
 const BATCH_SIZE = 3 // small batch so a run reliably finishes within maxDuration
 
 export async function GET(req: NextRequest) {
