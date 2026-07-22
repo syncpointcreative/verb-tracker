@@ -16,6 +16,7 @@
  *
  * Manual testing:
  *   curl ".../api/cron/drive-sync" -H "Authorization: Bearer <CRON_SECRET>"
+ *   curl ".../api/cron/drive-sync" -H "x-api-key: <AUTH_API_KEY>"
  *
  * Required env vars:
  *   CRON_SECRET       — must match Authorization: Bearer header
@@ -38,7 +39,10 @@ const BATCH_SIZE = 3 // small batch so a run reliably finishes within maxDuratio
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const apiKey     = req.headers.get('x-api-key')
+  const validCron  = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  const validAdmin = apiKey !== null && apiKey === process.env.AUTH_API_KEY
+  if (!validCron && !validAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
