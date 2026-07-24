@@ -15,6 +15,7 @@ interface Asset {
   id: string; client_id: string; product_id: string; stage: string
   asset_name: string; content_type: string | null; file_name: string | null
   status: string; date_added: string | null; posted_by: string | null; notes: string | null
+  ad_only?: boolean; spark_item_id?: string | null
 }
 
 const STAGES = ['Awareness', 'Community Interaction', 'Consideration', 'Conversion']
@@ -32,7 +33,7 @@ export default function AdminPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [assets, setAssets]         = useState<Asset[]>([])
   const [loading, setLoading]       = useState(true)
-  const [tab, setTab]               = useState<'deliveries' | 'assets' | 'add' | 'downloads'>('deliveries')
+  const [tab, setTab]               = useState<'deliveries' | 'monthly' | 'assets' | 'add' | 'downloads'>('deliveries')
   const [driveQueue, setDriveQueue] = useState<Array<{
     id: string; file_name: string; client_name: string; status: string; created_at: string; drive_url: string | null; downloaded_at: string | null
   }>>([])
@@ -192,6 +193,37 @@ export default function AdminPage() {
     deliveriesByMonth[key].push(d)
   }
 
+  // ── Monthly Count (deliverable audit) ────────────────────────────────────────
+  // Physical count of *coded* deliverables per content-month, straight from the
+  // assets table — mirrors the server counter's exclusions plus a creator-code
+  // guard (must start with a code prefix like CHOMPS-/FLAV-/Biom-/JOO-/JUNK-/ESW-,
+  // no leading space/paren), so organic posts, catalog videos, and junk don't count.
+  const nameCoded = (nm: string) =>
+    !/-EXT-/i.test(nm) && !/-SPK-/i.test(nm) && /^[A-Za-z0-9]{2,10}-/.test(nm)
+  const isDeliverable = (a: Asset) =>
+    a.ad_only === false && !a.spark_item_id && !!a.date_added && nameCoded(a.asset_name)
+  const quotaFor = (clientId: string, ym: string) =>
+    deliveries.find(d => d.client_id === clientId && d.month.slice(0, 7) === ym)?.quota ?? 30
+  const monthlyClients = [...clients]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => {
+      const dated = assets.filter(a => a.client_id === c.id && a.date_added)
+      const qualifying = dated.filter(isDeliverable)
+      const excluded = dated.length - qualifying.length
+      const bank = assets.filter(a =>
+        a.client_id === c.id && a.status === 'Ready to Upload' &&
+        a.ad_only === false && !a.spark_item_id && nameCoded(a.asset_name)).length
+      const byMonth: Record<string, Asset[]> = {}
+      for (const a of qualifying) {
+        const ym = (a.date_added as string).slice(0, 7)
+        if (ym < '2026-03') continue
+        ;(byMonth[ym] ||= []).push(a)
+      }
+      const months = Object.keys(byMonth).sort()
+      return { c, months, byMonth, excluded, bank }
+    })
+    .filter(x => x.months.length > 0)
+
   return (
     <div className="max-w-5xl mx-auto">
       {/* Toast */}
@@ -212,7 +244,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {([['deliveries', 'Monthly Deliveries'], ['assets', 'Asset Status'], ['add', 'Add Asset'], ['downloads', 'Downloads']] as const).map(([key, label]) => (
+        {([['deliveries', 'Monthly Deliveries'], ['monthly', 'Monthly Count'], ['assets', 'Asset Status'], ['add', 'Add Asset'], ['downloads', 'Downloads']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -226,6 +258,77 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {/* ── TAB: Monthly Count (deliverable audit) ──────────────────────────────── */}
+      {tab === 'monthly' && (
+        <div className="space-y-8">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+            Physical count of <b>coded deliverables</b> per content-month, straight from the assets table
+            (excludes ad-only, Spark, <code>-EXT-</code>, and non-coded/organic names). Use it to spot
+            repeats or missing pieces and to see how many are still due vs. quota. Read-only.
+          </div>
+          {monthlyClients.length === 0 && (
+            <p className="text-sm text-gray-400">No coded deliverables found.</p>
+          )}
+          {monthlyClients.map(({ c, months, byMonth, excluded, bank }) => (
+            <div key={c.id}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-gray-700">{c.name}</h2>
+                <span className="text-xs text-gray-500">
+                  Unscheduled bank: <b>{bank}</b>
+                  {excluded > 0 && <> · <span className="text-amber-700">{excluded} excluded (non-coded / SPK / EXT)</span></>}
+                </span>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="text-left px-4 py-2.5">Month</th>
+                      <th className="text-center px-4 py-2.5 w-28">Delivered</th>
+                      <th className="text-center px-4 py-2.5 w-20">Quota</th>
+                      <th className="text-center px-4 py-2.5 w-20">Due</th>
+                      <th className="text-center px-4 py-2.5 w-40">Repeats</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {months.map(ym => {
+                      const rows = byMonth[ym]
+                      const counts: Record<string, number> = {}
+                      for (const a of rows) counts[a.asset_name] = (counts[a.asset_name] || 0) + 1
+                      const repeats = Object.values(counts).filter(n => n > 1).length
+                      const quota = quotaFor(c.id, ym)
+                      const due = Math.max(0, quota - rows.length)
+                      return (
+                        <tr key={ym} className="align-top hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">{fmt(ym + '-01')}</td>
+                          <td className="px-4 py-3 text-center font-semibold text-gray-800">{rows.length}</td>
+                          <td className="px-4 py-3 text-center text-gray-500">{quota}</td>
+                          <td className={`px-4 py-3 text-center ${due > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{due}</td>
+                          <td className="px-4 py-3 text-center">
+                            {repeats > 0
+                              ? <span className="text-amber-700 font-semibold">⚠️ {repeats}</span>
+                              : <span className="text-gray-300">—</span>}
+                            <details className="mt-1 text-left">
+                              <summary className="cursor-pointer text-xs text-blue-600 hover:underline">view {rows.length}</summary>
+                              <ul className="mt-1 space-y-0.5">
+                                {Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0])).map(([nm, n]) => (
+                                  <li key={nm} className={`text-xs ${n > 1 ? 'text-amber-700 font-medium' : 'text-gray-600'}`}>
+                                    {n > 1 ? `⚠️ ×${n} ` : ''}{nm}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── TAB: Monthly Deliveries ────────────────────────────────────────────── */}
       {tab === 'deliveries' && (
