@@ -201,6 +201,26 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'PBVP', name: 'Protein Bar Variety Pack' },
     ],
   },
+  {
+    client: 'Shameless', code: 'SHAME',
+    products: [
+      { code: 'SSVP',  name: 'Shameless Snacks Variety Pack' },
+      { code: 'SSMM',  name: 'Sour Mango Madness' },
+      { code: 'SSCC',  name: 'So Cool Cola' },
+      { code: 'SSBR',  name: 'Super Sour Blue Raspberry' },
+      { code: 'SSSP',  name: 'Sour Pineapple' },
+      { code: 'SSBC',  name: 'So Beary Cherry' },
+      { code: 'SSWW',  name: 'Wassup Watermelon' },
+      { code: 'SSCB',  name: 'Sour Cherry Bomb' },
+      { code: 'SSWRM', name: 'Super Wild Worms' },
+      { code: 'SSOB',  name: 'Orange Blossom' },
+      { code: 'SSGA',  name: 'Green Apple Blast' },
+      { code: 'SSOMG', name: 'OMG Sour Peach' },
+      { code: 'SSRS',  name: 'Rasberry Sour Scouts' },
+      { code: 'SSSS',  name: 'Strawberry Sour' },
+      { code: 'SSSG',  name: 'Sour Gooey Fruit' },
+    ],
+  },
 ]
 
 // Legacy content-type codes — retained for filename back-compat only.
