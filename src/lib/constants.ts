@@ -71,6 +71,7 @@ export const CLIENT_CODES: Record<string, string> = {
   HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
   MOMO: 'Momofuku', JOO: 'Joolies', ESW: 'ESW Beauty',
   EPAT: 'E-Patrol', JUNK: 'Junkless',
+  SHAME: 'Shameless',
 }
 export const PRODUCT_CODES: Record<string, string> = {
   FT: 'FaceTub',
@@ -109,6 +110,22 @@ export const PRODUCT_CODES: Record<string, string> = {
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
   // Junkless
   PBVP: 'Protein Bar Variety Pack',
+  // Shameless
+  SSVP: 'Shameless Snacks Variety Pack',
+  SSMM: 'Sour Mango Madness',
+  SSCC: 'So Cool Cola',
+  SSBR: 'Super Sour Blue Raspberry',
+  SSSP: 'Sour Pineapple',
+  SSBC: 'So Beary Cherry',
+  SSWW: 'Wassup Watermelon',
+  SSCB: 'Sour Cherry Bomb',
+  SSWRM: 'Super Wild Worms',
+  SSOB: 'Orange Blossom',
+  SSGA: 'Green Apple Blast',
+  SSOMG: 'OMG Sour Peach',
+  SSRS: 'Rasberry Sour Scouts',
+  SSSS: 'Strawberry Sour',
+  SSSG: 'Sour Gooey Fruit',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
