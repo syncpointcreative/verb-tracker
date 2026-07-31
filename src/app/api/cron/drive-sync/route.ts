@@ -29,7 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { uploadFile } from '@/lib/storage'
-import { findBoardByName, updateItemLinkColumn } from '@/lib/monday'
+import { findBoardByName, updateItemLinkColumn, mondayQuery } from '@/lib/monday'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
 // 300s requires Vercel Pro; Hobby plan caps at 60s regardless of this value.
@@ -250,8 +250,17 @@ async function backLinkDriveUrl(
     const board = await findBoardByName(clientName).catch(() => null)
     if (!board) return
 
-    const linkCol = board.columns.find(c => c.type === 'link')
-    if (!linkCol) return
+    let linkCol = board.columns.find(c => c.type === 'link')
+    if (!linkCol) {
+      // Auto-create link column if the board doesn't have one yet
+      const created = await mondayQuery<{ create_column: { id: string; title: string } }>(`
+        mutation($boardId: ID!, $title: String!, $colType: ColumnType!) {
+          create_column(board_id: $boardId, title: $title, column_type: $colType) { id title }
+        }
+      `, { boardId: board.id, title: 'Link', colType: 'link' }).catch(() => null)
+      if (!created) return
+      linkCol = { id: created.create_column.id, title: created.create_column.title, type: 'link' }
+    }
 
     for (const asset of withMonday) {
       await updateItemLinkColumn(
