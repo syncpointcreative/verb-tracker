@@ -138,17 +138,20 @@ async function ensureGoogleSubfolder(token: string, parentId: string, name: stri
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-// Month folder name from a filename's MMDDYY date suffix — month name only
-// (e.g. "July"), no year, per the client-folder convention. Date code "07…" → July,
-// "08…" → August. Falls back to the current month when no date code is present.
+// Month folder name from a filename's MMDDYY date suffix — "Month YYYY"
+// (e.g. "July 2026"), matching the Shared Drive convention. Date code
+// "07…26" → "July 2026", "08…26" → "August 2026". Falls back to the current
+// month + year when no date code is present.
 function monthFolderName(filename: string): string {
   // Parse MMDDYY date suffix from filename (e.g. CHOMPS-SMK-AWA-LR-Hook-050626.mp4)
   const m = filename.match(/[-_](\d{2})\d{2}(\d{2})(?:\.[^.]+)*$/)
   if (m) {
     const mm = parseInt(m[1], 10)
-    if (mm >= 1 && mm <= 12) return MONTHS[mm - 1]
+    const yy = parseInt(m[2], 10)
+    if (mm >= 1 && mm <= 12) return `${MONTHS[mm - 1]} ${2000 + yy}`
   }
-  return MONTHS[new Date().getMonth()]
+  const now = new Date()
+  return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`
 }
 
 async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: UploadInput): Promise<string> {
