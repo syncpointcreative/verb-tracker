@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/drive-sync",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/delivery-sync",
