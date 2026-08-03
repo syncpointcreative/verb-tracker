@@ -136,17 +136,19 @@ async function ensureGoogleSubfolder(token: string, parentId: string, name: stri
   return created.id
 }
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+// Month folder name from a filename's MMDDYY date suffix — month name only
+// (e.g. "July"), no year, per the client-folder convention. Date code "07…" → July,
+// "08…" → August. Falls back to the current month when no date code is present.
 function monthFolderName(filename: string): string {
-  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
   // Parse MMDDYY date suffix from filename (e.g. CHOMPS-SMK-AWA-LR-Hook-050626.mp4)
   const m = filename.match(/[-_](\d{2})\d{2}(\d{2})(?:\.[^.]+)*$/)
   if (m) {
     const mm = parseInt(m[1], 10)
-    const yy = parseInt(m[2], 10)
-    if (mm >= 1 && mm <= 12) return `${MONTHS[mm - 1]} ${2000 + yy}`
+    if (mm >= 1 && mm <= 12) return MONTHS[mm - 1]
   }
-  const now = new Date()
-  return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`
+  return MONTHS[new Date().getMonth()]
 }
 
 async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: UploadInput): Promise<string> {
@@ -158,8 +160,18 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: Uplo
   const clientFolder = await ensureGoogleSubfolder(token, rootFolderId, clientName)
   const monthFolder  = await ensureGoogleSubfolder(token, clientFolder, monthFolderName(fileName))
 
+  // Joolies splits each month into two folders: "11S-Content" (agency-produced,
+  // i.e. everything ingested from Slack — this pipeline) and "Joolies Content"
+  // (brand-supplied, placed manually). All Slack files land in 11S-Content; we
+  // also ensure the brand folder exists so it's ready alongside it.
+  let destFolder = monthFolder
+  if (clientName.trim().toLowerCase() === 'joolies') {
+    await ensureGoogleSubfolder(token, monthFolder, 'Joolies Content')
+    destFolder = await ensureGoogleSubfolder(token, monthFolder, '11S-Content')
+  }
+
   const boundary = '-------storageupload'
-  const metadata = JSON.stringify({ name: fileName, parents: [monthFolder] })
+  const metadata = JSON.stringify({ name: fileName, parents: [destFolder] })
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
     fileBuffer,
