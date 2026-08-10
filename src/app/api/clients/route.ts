@@ -38,3 +38,35 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
 }
+
+// PATCH /api/clients?id=... — update one or more fields on an existing client.
+// Separate from POST (which upserts-by-slug with hardcoded defaults for new-client
+// onboarding) so an existing client's drive_url/color_hex/etc. can be corrected
+// without clobbering its other fields back to those defaults.
+export async function PATCH(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'Missing ?id=' }, { status: 400 })
+
+  const supabase = createServerClient()
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
+
+  const allowed = ['name', 'slug', 'color_hex', 'drive_url', 'tracks_deliveries']
+  const updates: Record<string, unknown> = {}
+  for (const key of allowed) {
+    if (key in body) updates[key] = body[key]
+  }
+  if (!Object.keys(updates).length) {
+    return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 })
+  }
+
+  const { data, error } = await supabase
+    .from('clients')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}
