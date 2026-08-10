@@ -106,6 +106,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   SCR: 'Strawberry Coco Rose', BSK: 'Beauty Sleep Kit',
   RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
   GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',    AFF: 'Affiliate',
+  PMS: 'Papaya Milk Serum',
   // E-Patrol
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
   // Junkless
