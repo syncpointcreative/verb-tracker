@@ -185,6 +185,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'GHK',  name: 'Get Hydrated Kit' },
       { code: 'PDRN', name: 'PDRN' },
       { code: 'AFF',  name: 'Affiliate' },
+      { code: 'PMS',  name: 'Papaya Milk Serum' },
     ],
   },
   {
