@@ -4,9 +4,11 @@ import SidebarNav, { type ClientHealth } from './SidebarNav'
 export default async function Sidebar() {
   const supabase = createServerClient()
 
+  // FlavCity: relationship ended 2026-08-17. Hide from UI without deleting historical data/rows.
   const { data: clients } = await supabase
     .from('clients')
     .select('*')
+    .neq('slug', 'flavcity')
     .order('name')
 
   const { data: assets } = await supabase

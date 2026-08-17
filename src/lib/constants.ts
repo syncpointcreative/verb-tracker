@@ -68,7 +68,7 @@ export const ASSET_NEEDS_CHANNEL_ID = process.env.SLACK_ASSET_NEEDS_CHANNEL_ID ?
 // Naming convention parser maps
 export const CLIENT_CODES: Record<string, string> = {
   BIOM: 'Biom', CHOMPS: 'Chomps', HIMA: 'Himapure',
-  HL: 'Home & Laundry', DUPES: 'Dupes & Co', FLAV: 'FlavCity', FTUB: 'FaceTub', FT: 'FaceTub',
+  HL: 'Home & Laundry', DUPES: 'Dupes & Co', FTUB: 'FaceTub', FT: 'FaceTub',
   MOMO: 'Momofuku', JOO: 'Joolies', ESW: 'ESW Beauty',
   EPAT: 'E-Patrol', JUNK: 'Junkless',
   SHAME: 'Shameless',

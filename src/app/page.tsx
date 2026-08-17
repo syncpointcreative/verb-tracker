@@ -85,7 +85,8 @@ async function getLeaderboard(): Promise<LeaderboardEntry[]> {
 
 async function getClientSummaries(): Promise<ClientSummary[]> {
   const supabase = createServerClient()
-  const { data: clients } = await supabase.from('clients').select('*').order('name')
+  // FlavCity: relationship ended 2026-08-17. Hide from UI without deleting historical data/rows.
+  const { data: clients } = await supabase.from('clients').select('*').neq('slug', 'flavcity').order('name')
   if (!clients?.length) return []
 
   const clientPeriods = new Map<string, { currentStart: string; nextStart: string; billingDay: number }>()

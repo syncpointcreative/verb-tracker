@@ -14,7 +14,8 @@ export default async function MatrixPage() {
   const supabase = createServerClient()
 
   const [{ data: clients }, { data: products }, { data: assets }] = await Promise.all([
-    supabase.from('clients').select('*').order('name'),
+    // FlavCity: relationship ended 2026-08-17. Hide from UI without deleting historical data/rows.
+    supabase.from('clients').select('*').neq('slug', 'flavcity').order('name'),
     supabase.from('products').select('*').order('sort_order'),
     supabase.from('assets').select('*'),
   ])

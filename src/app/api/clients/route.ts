@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const supabase = createServerClient()
-  const { data, error } = await supabase.from('clients').select('*').order('name')
+  // FlavCity: relationship ended 2026-08-17. Hide from UI without deleting historical data/rows.
+  const { data, error } = await supabase.from('clients').select('*').neq('slug', 'flavcity').order('name')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
