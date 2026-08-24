@@ -79,7 +79,7 @@ export default function SidebarNav({ clients, healthByClient }: Props) {
       {/* Drive link */}
       <div className="px-5 py-4 border-t border-white/10 flex-shrink-0">
         <a
-          href="https://drive.google.com/drive/folders/1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm?usp=sharing"
+          href="https://drive.google.com/drive/folders/1yux8nceUkA5_Nw3Wp9mu33Jw2IeIsoZ0?usp=sharing"
           target="_blank"
           rel="noreferrer"
           className="text-xs text-[#d4865e] hover:text-[#e0a07d] tracking-[0.12em] uppercase flex items-center gap-1.5 transition-colors"
