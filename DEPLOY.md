@@ -142,7 +142,7 @@ When Libby reacts to a message in `#creative-asset-submissions-only` with ✅, t
 ### 5b. Share your Drive folder with the service account
 
 1. Open [Google Drive](https://drive.google.com) and navigate to your root assets folder
-   (currently `1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm`)
+   (currently `1yux8nceUkA5_Nw3Wp9mu33Jw2IeIsoZ0`)
 2. Right-click → **Share** → paste the service account email (looks like `verb-drive-upload@your-project.iam.gserviceaccount.com`)
 3. Give it **Editor** access → Share
 
@@ -151,7 +151,7 @@ When Libby reacts to a message in `#creative-asset-submissions-only` with ✅, t
 | Variable | Value |
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | The full contents of the JSON key file (paste the whole thing) |
-| `GOOGLE_DRIVE_FOLDER_ID` | `1Kk6ZubDH3Jfw1TIVXkRj5w7ohn92M3Zm` (your root folder) |
+| `GOOGLE_DRIVE_FOLDER_ID` | `1yux8nceUkA5_Nw3Wp9mu33Jw2IeIsoZ0` (your root folder) |
 
 ### 5d. Add `reaction_added` to Slack Event Subscriptions
 
