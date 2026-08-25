@@ -79,6 +79,10 @@ async function countDeliverables(
     .eq('ad_only', false)
     .is('spark_item_id', null)
     .not('asset_name', 'ilike', '%-EXT-%')
+    // Spark ads are not content deliverables (also excluded via spark_item_id, but
+    // guard the name for rows where that field wasn't populated). Creator-code prefix
+    // guard is applied in the admin "Monthly Count" audit view; add here if billing needs it.
+    .not('asset_name', 'ilike', '%-SPK-%')
     .gte('date_added', periodStart)
     .lt('date_added', periodEnd)
   return count ?? 0
@@ -116,6 +120,7 @@ export async function refreshDeliveredCount(
       .eq('ad_only', false)
       .is('spark_item_id', null)
       .not('asset_name', 'ilike', '%-EXT-%')
+      .not('asset_name', 'ilike', '%-SPK-%')
       .not('date_added', 'is', null)
       .order('date_added', { ascending: true })
       .limit(1)
