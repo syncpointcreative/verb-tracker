@@ -107,6 +107,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   RSK: 'Rise and Shine Kit',   ASK: 'Awaken Skin Kit',
   GHK: 'Get Hydrated Kit',     PDRN: 'PDRN',    AFF: 'Affiliate',
   PMS: 'Papaya Milk Serum',
+  PSM: 'Peach Sorbet Moisturizer',
   // E-Patrol
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
   // Junkless
