@@ -111,6 +111,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   LC: 'Longevity Coffee', AC: 'Alpenglow Cocoa', FF: 'Farmstand Fruit',
   // Junkless
   PBVP: 'Protein Bar Variety Pack',
+  GBVP: 'Granola Bar Variety Pack',
+  HG: 'Halloween Granola',
   // Shameless
   SSVP: 'Shameless Snacks Variety Pack',
   SSMM: 'Sour Mango Madness',
