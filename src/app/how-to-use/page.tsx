@@ -200,6 +200,8 @@ const PRODUCT_CODES_BY_CLIENT: {
     client: 'Junkless', code: 'JUNK',
     products: [
       { code: 'PBVP', name: 'Protein Bar Variety Pack' },
+      { code: 'GBVP', name: 'Granola Bar Variety Pack' },
+      { code: 'HG',   name: 'Halloween Granola' },
     ],
   },
   {
