@@ -11,6 +11,14 @@
  *   google:
  *     GOOGLE_SERVICE_ACCOUNT_JSON  Full JSON key downloaded from GCP console
  *     GOOGLE_DRIVE_FOLDER_ID       Root folder ID (files land in {root}/{clientName}/)
+ *     GOOGLE_IMPERSONATE_EMAIL     (optional) Workspace user to impersonate via domain-wide
+ *                                  delegation. Required when the root folder lives in that
+ *                                  user's personal My Drive rather than a Shared Drive —
+ *                                  service accounts have zero storage quota of their own, so
+ *                                  uploads must run as a real user to use their quota. Needs
+ *                                  the SA's OAuth client ID authorized for the `drive` scope
+ *                                  in the Workspace Admin console (Security > API controls >
+ *                                  Domain-wide delegation) first.
  *
  *   dropbox:
  *     DROPBOX_ACCESS_TOKEN         Long-lived access token (or refresh token flow)
@@ -86,6 +94,7 @@ export async function getGoogleToken(): Promise<string> {
 
   const sa: { client_email: string; private_key: string; token_uri?: string } = JSON.parse(raw)
   const now    = Math.floor(Date.now() / 1000)
+  const impersonate = process.env.GOOGLE_IMPERSONATE_EMAIL
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
   const claim  = b64url(JSON.stringify({
     iss: sa.client_email,
@@ -93,6 +102,9 @@ export async function getGoogleToken(): Promise<string> {
     aud: sa.token_uri ?? 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
+    // Domain-wide delegation: mint the token as this Workspace user instead of the SA
+    // itself, so uploads count against their storage quota and are owned by them.
+    ...(impersonate ? { sub: impersonate } : {}),
   }))
 
   const toSign = `${header}.${claim}`
