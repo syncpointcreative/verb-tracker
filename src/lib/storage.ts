@@ -207,7 +207,23 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: Uplo
     }
   )
   const json = await res.json() as { id?: string; webViewLink?: string; error?: unknown }
-  if (!json.id) throw new Error(`Google upload failed: ${JSON.stringify(json)}`)
+  if (!json.id) {
+    // Diagnostic: surface exactly what identity the access token represents so a
+    // storageQuotaExceeded failure here can be distinguished from "impersonation
+    // never applied" vs. "delegation authorized for the wrong client/scope" vs.
+    // "the impersonated user's own quota is actually full" — all three produce
+    // similar-looking errors otherwise.
+    let tokenIdentity = 'lookup failed'
+    try {
+      const infoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${token}`)
+      tokenIdentity = JSON.stringify(await infoRes.json())
+    } catch (e) {
+      tokenIdentity = `lookup threw: ${(e as Error).message}`
+    }
+    throw new Error(
+      `Google upload failed: ${JSON.stringify(json)} | impersonate_env=${process.env.GOOGLE_IMPERSONATE_EMAIL ?? 'UNSET'} | token_identity=${tokenIdentity}`
+    )
+  }
   return json.webViewLink ?? `https://drive.google.com/file/d/${json.id}/view`
 }
 
