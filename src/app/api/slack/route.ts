@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { parseFilename, inferStage, validateFilename } from '@/lib/parser'
 import { SLACK_CHANNEL_ID, SLACK_WORKSPACE_URL } from '@/lib/constants'
-import { refreshDeliveredCount } from '@/lib/deliveries'
+import { refreshDeliveredCount, checkAndApplyQuotaRollover } from '@/lib/deliveries'
 import {
   findBoardByName,
   findOrCreateIncomingGroup,
@@ -83,8 +83,16 @@ async function getFileIdsForMessage(messageTs: string): Promise<string[]> {
  * Fetch the message at `messageTs` from the submissions channel,
  * resolve each attached file's client name, and insert pending rows
  * into drive_queue for the hourly cron to process.
+ *
+ * `overrideMonthByFileName` carries quota-rollover folder overrides (see
+ * checkAndApplyQuotaRollover) keyed by raw Slack filename — when present for
+ * a file, drive-sync uses that "Month YYYY" folder instead of deriving one
+ * from the filename's date suffix.
  */
-async function queueApprovedFiles(messageTs: string): Promise<void> {
+async function queueApprovedFiles(
+  messageTs: string,
+  overrideMonthByFileName?: Map<string, string>
+): Promise<void> {
   const token = process.env.SLACK_BOT_TOKEN
   if (!token) return
 
@@ -134,6 +142,7 @@ async function queueApprovedFiles(messageTs: string): Promise<void> {
       mimetype:             file.mimetype || 'video/mp4',
       client_name:          parsed.clientName,
       status:               'pending',
+      override_month_folder: overrideMonthByFileName?.get(file.name) ?? null,
     })
   }
 }
@@ -306,9 +315,45 @@ export async function POST(req: NextRequest) {
     if (userId && APPROVERS.includes(userId) && itemChannel === SLACK_CHANNEL_ID && messageTs) {
       if (reaction === 'white_check_mark') {
         // ✅ — approve for ads + counts toward monthly asset counter + Monday item
-        await queueApprovedFiles(messageTs)
-
         const supabase = createServerClient()
+
+        // Quota rollover check — BEFORE ad_only flips to false (i.e. before these
+        // assets start counting) so any asset that would push its period over
+        // quota gets its date_added + Drive folder bumped to next period first.
+        const overrideMonthByFileName = new Map<string, string>()
+        const { data: pendingAssets } = await supabase
+          .from('assets')
+          .select('id, asset_name, file_name, client_id, date_added')
+          .eq('slack_message_ts', messageTs)
+          .eq('slack_channel_id', SLACK_CHANNEL_ID)
+          .eq('status', 'Pending Review')
+
+        if (pendingAssets?.length) {
+          const clientIds = [...new Set(pendingAssets.map(a => a.client_id))]
+          const { data: clientRows } = await supabase
+            .from('clients')
+            .select('id, name, billing_day, default_quota, tracks_deliveries')
+            .in('id', clientIds)
+          const clientById = new Map((clientRows ?? []).map(c => [c.id, c]))
+
+          // Sequential (not parallel) — each check's quota-count query must see
+          // the date_added update from any prior asset rolled in this same batch.
+          for (const asset of pendingAssets) {
+            if (!asset.date_added) continue
+            const client = clientById.get(asset.client_id)
+            if (!client || client.tracks_deliveries === false) continue
+
+            try {
+              const rollover = await checkAndApplyQuotaRollover(supabase, asset, client)
+              if (rollover) overrideMonthByFileName.set(asset.file_name, rollover.folderName)
+            } catch (err) {
+              console.error(`[slack] quota rollover check failed for ${asset.file_name}:`, err)
+            }
+          }
+        }
+
+        await queueApprovedFiles(messageTs, overrideMonthByFileName)
+
         await supabase
           .from('assets')
           .update({ status: 'Ready to Upload', ad_only: false })

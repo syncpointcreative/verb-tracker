@@ -44,6 +44,10 @@ export interface UploadInput {
   fileName:   string  // e.g. CHOMPS-SMK-UGC-LR-050626.mp4
   mimeType:   string  // e.g. video/mp4
   clientName: string  // e.g. Chomps  (used as subfolder name)
+  // Pre-computed "Month YYYY" folder name (e.g. "October 2026") that overrides
+  // the filename-derived month — set when quota rollover bumped this asset to
+  // the next period. Google Drive only; other providers ignore it.
+  overrideMonthFolder?: string
 }
 
 /** Upload a file from Slack to the configured storage provider. Returns a public/shareable URL. */
@@ -166,14 +170,14 @@ function monthFolderName(filename: string): string {
   return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`
 }
 
-async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName }: UploadInput): Promise<string> {
+async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName, overrideMonthFolder }: UploadInput): Promise<string> {
   const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID
   if (!rootFolderId) throw new Error('GOOGLE_DRIVE_FOLDER_ID not set')
 
   const token        = await getGoogleToken()
   const fileBuffer   = await downloadFromSlack(slackUrl)
   const clientFolder = await ensureGoogleSubfolder(token, rootFolderId, clientName)
-  const monthFolder  = await ensureGoogleSubfolder(token, clientFolder, monthFolderName(fileName))
+  const monthFolder  = await ensureGoogleSubfolder(token, clientFolder, overrideMonthFolder || monthFolderName(fileName))
 
   // Joolies splits each month into two folders: "11S-Content" (agency-produced,
   // i.e. everything ingested from Slack — this pipeline) and "Joolies Content"
