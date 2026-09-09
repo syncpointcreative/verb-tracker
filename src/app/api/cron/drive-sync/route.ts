@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   // Grab the oldest pending items (one batch at a time)
   const { data: items, error } = await supabase
     .from('drive_queue')
-    .select('id, slack_file_id, file_name, url_private_download, mimetype, client_name')
+    .select('id, slack_file_id, file_name, url_private_download, mimetype, client_name, override_month_folder')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
     .limit(BATCH_SIZE)
@@ -91,9 +91,10 @@ export async function GET(req: NextRequest) {
       try {
         driveUrl = await uploadFile({
           slackUrl,
-          fileName:   item.file_name,
-          mimeType:   item.mimetype,
-          clientName: item.client_name,
+          fileName:            item.file_name,
+          mimeType:            item.mimetype,
+          clientName:          item.client_name,
+          overrideMonthFolder: item.override_month_folder ?? undefined,
         })
       } catch (firstErr) {
         // Refresh the stored URL when it's expired: Slack signals this either as a
@@ -113,10 +114,11 @@ export async function GET(req: NextRequest) {
 
         // Retry upload with fresh URL
         driveUrl = await uploadFile({
-          slackUrl:   freshUrl,
-          fileName:   item.file_name,
-          mimeType:   item.mimetype,
-          clientName: item.client_name,
+          slackUrl:            freshUrl,
+          fileName:            item.file_name,
+          mimeType:            item.mimetype,
+          clientName:          item.client_name,
+          overrideMonthFolder: item.override_month_folder ?? undefined,
         })
       }
 

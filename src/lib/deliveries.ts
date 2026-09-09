@@ -19,6 +19,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 const MAX_LOOKAHEAD_MONTHS = 12
 const DEFAULT_QUOTA = 30
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 // Earliest month the tracker accounts for. Content dated before this is treated
 // as bad data (e.g. a filename-date typo) and never anchors the rollover walk —
@@ -82,6 +83,87 @@ async function countDeliverables(
     .gte('date_added', periodStart)
     .lt('date_added', periodEnd)
   return count ?? 0
+}
+
+export interface QuotaRolloverResult {
+  newDateAdded: string  // "YYYY-MM-DD" — the target period's start date
+  folderName:   string  // "Month YYYY" — the Drive folder this asset must land in
+}
+
+/**
+ * Hard-line quota rollover (Seth, 2026-09-09): once a client's period already
+ * has `quota` qualifying deliverables, any further asset for that period is
+ * bumped to the next period — both its `date_added` (so it counts against the
+ * next period, not the maxed-out current one) and its Drive folder placement.
+ * No grace buffer: the very next asset over quota rolls immediately.
+ *
+ * Call this at ✅ approval time, BEFORE the asset's ad_only flag flips to
+ * false (i.e. before it starts counting) and BEFORE refreshDeliveredCount, so
+ * the recompute picks up the corrected date_added in one pass.
+ *
+ * Returns null if the asset's period still has room (no rollover needed).
+ * Logs every rollover to `quota_rollovers` — notify-after, not a hard gate;
+ * Seth gets pinged per rollover and manually deletes from Drive if it's a reject.
+ */
+export async function checkAndApplyQuotaRollover(
+  supabase: SupabaseClient,
+  asset: { id: string; asset_name: string; date_added: string },
+  client: { id: string; name: string; billing_day: number | null; default_quota: number | null }
+): Promise<QuotaRolloverResult | null> {
+  const billingDay = client.billing_day ?? 1
+  const clientQuota = client.default_quota ?? DEFAULT_QUOTA
+
+  let ym = periodYMForDate(asset.date_added, billingDay)
+
+  // Walk forward until we find a period with room (normally exactly one hop —
+  // capped at MAX_LOOKAHEAD_MONTHS as a safety guard against runaway loops).
+  for (let hop = 0; hop <= MAX_LOOKAHEAD_MONTHS; hop++) {
+    const nextYM = addMonthsToYM(ym, 1)
+    const pStart = periodStr(ym.year, ym.month, billingDay)
+    const pEnd   = periodStr(nextYM.year, nextYM.month, billingDay)
+
+    const { data: row } = await supabase
+      .from('monthly_deliveries')
+      .select('quota')
+      .eq('client_id', client.id)
+      .eq('month', pStart)
+      .maybeSingle()
+    const quota = row?.quota ?? clientQuota
+
+    const { count } = await supabase
+      .from('assets')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', client.id)
+      .eq('ad_only', false)
+      .is('spark_item_id', null)
+      .not('asset_name', 'ilike', '%-EXT-%')
+      .gte('date_added', pStart)
+      .lt('date_added', pEnd)
+      .neq('id', asset.id)
+
+    if ((count ?? 0) < quota) {
+      if (hop === 0) return null // this asset's original period still has room
+
+      // Rolled forward at least one period — persist + log it.
+      const folderName = `${MONTHS[ym.month - 1]} ${ym.year}`
+      await supabase.from('assets').update({ date_added: pStart }).eq('id', asset.id)
+      await supabase.from('quota_rollovers').insert({
+        asset_id:            asset.id,
+        client_id:           client.id,
+        client_name:         client.name,
+        asset_name:          asset.asset_name,
+        original_date_added: asset.date_added,
+        new_date_added:      pStart,
+        folder_name:         folderName,
+      })
+      return { newDateAdded: pStart, folderName }
+    }
+
+    ym = nextYM
+  }
+
+  console.error(`[quota-rollover] exhausted ${MAX_LOOKAHEAD_MONTHS}-month lookahead for asset ${asset.id} — leaving date_added unchanged`)
+  return null
 }
 
 export async function refreshDeliveredCount(
