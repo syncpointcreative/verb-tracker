@@ -159,11 +159,15 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 // "07…26" → "July 2026", "08…26" → "August 2026". Falls back to the current
 // month + year when no date code is present.
 function monthFolderName(filename: string): string {
-  // Parse MMDDYY date suffix from filename (e.g. CHOMPS-SMK-AWA-LR-Hook-050626.mp4)
-  const m = filename.match(/[-_](\d{2})\d{2}(\d{2})(?:\.[^.]+)*$/)
+  // Parse MMDDYY date suffix from filename (e.g. CHOMPS-SMK-AWA-LR-Hook-050626.mp4).
+  // Tolerates trailing tags after the date, before the extension (e.g.
+  // "...-082726-CAPTIONS.mp4") — without this, such names fail to match and
+  // silently fall back to "now", misfiling into whatever month the upload
+  // happened to actually process in rather than the content's real month.
+  const m = filename.match(/[-_](\d{2})(\d{2})(\d{2})(?:[-_][^./]+)*\.[^.]*$/)
   if (m) {
     const mm = parseInt(m[1], 10)
-    const yy = parseInt(m[2], 10)
+    const yy = parseInt(m[3], 10)
     if (mm >= 1 && mm <= 12) return `${MONTHS[mm - 1]} ${2000 + yy}`
   }
   const now = new Date()
