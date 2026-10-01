@@ -10,8 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getGoogleToken, ensureGoogleSubfolder } from '@/lib/storage'
 
-export const runtime = 'edge'
-
+// Node runtime (not edge) — storage.ts's getGoogleToken signs JWTs with Node's crypto module.
 export async function GET(req: NextRequest) {
   const client = req.nextUrl.searchParams.get('client')?.trim()
   const month  = req.nextUrl.searchParams.get('month')?.trim()
