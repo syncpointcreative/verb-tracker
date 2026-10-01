@@ -9,13 +9,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { findBoardByName, duplicateBoard } from '@/lib/monday'
+import { findBoardByName, duplicateBoard, getBoardById } from '@/lib/monday'
 
 export const runtime = 'edge'
 
 const TEMPLATE_BOARD_NAME = 'TTS All Inclusive Template'
 
 export async function GET(req: NextRequest) {
+  const checkId = req.nextUrl.searchParams.get('check')?.trim()
+  if (checkId) {
+    const board = await getBoardById(checkId)
+    return NextResponse.json({ ok: true, board })
+  }
+
   const name = req.nextUrl.searchParams.get('name')?.trim()
   if (!name) {
     return NextResponse.json({ ok: false, error: 'Missing ?name=' }, { status: 400 })
