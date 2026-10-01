@@ -72,6 +72,7 @@ export const CLIENT_CODES: Record<string, string> = {
   MOMO: 'Momofuku', JOO: 'Joolies', ESW: 'ESW Beauty',
   EPAT: 'E-Patrol', JUNK: 'Junkless',
   SHAME: 'Shameless',
+  QCLS: 'QCLS',
 }
 export const PRODUCT_CODES: Record<string, string> = {
   FT: 'FaceTub',
@@ -129,6 +130,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   SSRS: 'Rasberry Sour Scouts',
   SSSS: 'Strawberry Sour',
   SSSG: 'Sour Gooey Fruit',
+  // Service-based clients (no physical products) — QCLS and any future service client
+  SERV: 'Service',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
