@@ -90,6 +90,16 @@ export async function duplicateBoard(boardId: string, newName: string): Promise<
   return data.duplicate_board.board.id
 }
 
+/** Look up a board by ID regardless of board_kind (public/private/share) or state. */
+export async function getBoardById(boardId: string): Promise<{ id: string; name: string; board_kind: string; state: string } | null> {
+  const data = await mondayQuery<{ boards: Array<{ id: string; name: string; board_kind: string; state: string }> }>(`
+    query($id: [ID!]) {
+      boards(ids: $id) { id name board_kind state }
+    }
+  `, { id: [boardId] })
+  return data.boards[0] ?? null
+}
+
 /** Find a board whose name contains the search string (case-insensitive).
  *  Skips "Subitems of …" boards that Monday auto-creates alongside main boards. */
 export async function findBoardByName(search: string): Promise<MondayBoard | null> {
