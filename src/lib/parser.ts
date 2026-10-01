@@ -10,6 +10,10 @@
  *   CLIENT-PRODUCT-TYPE-CREATOR-TITLE-DATE[.ext]        (6-part, no stage)
  *   CLIENT-PRODUCT-TYPE-CREATOR-DATE[.ext]              (5-part)
  *   e.g. BIOM-APW-UGC-DB-SpringReset-040726.mp4
+ *
+ * ACCOUNT-SPLIT (FlavCity REG/MEME):
+ *   CLIENT-PRODUCT-CREATOR-TITLE-DATE[.ext]             (5-part, no stage)
+ *   e.g. FLAV-REG-MA-SummerFlashSale-100126.mp4
  */
 import { CLIENT_CODES, PRODUCT_CODES, TYPE_CODES, CREATOR_CODES, STAGE_CODES } from './constants'
 import { Stage } from './supabase'
@@ -61,6 +65,17 @@ export function parseFilename(filename: string): ParsedFilename {
       const title      = origParts[titleIdx] ? toTitleCase(origParts[titleIdx]) : null
       const dateAdded  = parseDateCode(parts[titleIdx + 1]) ?? extractDateFromFilename(base)
       return { clientName, productName, contentType: null, stage: stageAtPos2, postedBy, title, dateAdded, hasCaption, confidence: 'high' }
+    }
+
+    // ── Account-split format: CLIENT-PRODUCT-CREATOR-TITLE-DATE (5-part, no stage) ──
+    // Used by FlavCity's REG/MEME account codes (no funnel stage encoded).
+    // Detected when parts[2] is a CREATOR code rather than a TYPE code — the two
+    // code sets are disjoint, so this can't misfire on existing legacy formats.
+    const creatorAtPos2 = CREATOR_CODES[parts[2]]
+    if (creatorAtPos2 && parts.length === 5) {
+      const title     = origParts[3] ? toTitleCase(origParts[3]) : null
+      const dateAdded = parseDateCode(parts[4]) ?? extractDateFromFilename(base)
+      return { clientName, productName, contentType: null, stage: null, postedBy: creatorAtPos2, title, dateAdded, hasCaption, confidence: 'high' }
     }
 
     // ── Legacy formats (parts[2] is a TYPE code) ───────────────────────────

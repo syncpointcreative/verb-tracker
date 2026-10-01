@@ -132,6 +132,8 @@ export const PRODUCT_CODES: Record<string, string> = {
   SSSG: 'Sour Gooey Fruit',
   // Service-based clients (no physical products) — QCLS and any future service client
   SERV: 'Service',
+  // FlavCity — account-split content (routes to its own Drive subfolder, see storage.ts)
+  REG: 'Main Account', MEME: 'Meme Account',
 }
 // Funnel stage codes — embedded in filename at position 3 (standard format, no TYPE)
 // Standard format: CLIENT-PRODUCT-STAGE-CREATOR-TITLE-DATE
