@@ -130,7 +130,7 @@ export async function getGoogleToken(): Promise<string> {
   return json.access_token
 }
 
-async function ensureGoogleSubfolder(token: string, parentId: string, name: string): Promise<string> {
+export async function ensureGoogleSubfolder(token: string, parentId: string, name: string): Promise<string> {
   const q = encodeURIComponent(
     `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
   )
@@ -191,6 +191,17 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName, overri
   if (clientName.trim().toLowerCase() === 'joolies') {
     await ensureGoogleSubfolder(token, monthFolder, 'Joolies Content')
     destFolder = await ensureGoogleSubfolder(token, monthFolder, '11S-Content')
+  }
+
+  // FlavCity splits each month into "MAIN ACCOUNT" (REG code) / "MEME ACCOUNT"
+  // (MEME code) — derived from the filename's 2nd segment, same place the
+  // product code normally lives (see parser.ts's account-split format).
+  if (clientName.trim().toLowerCase() === 'flavcity') {
+    const accountCode = fileName.toUpperCase().split('-')[1]
+    const accountFolder = accountCode === 'REG' ? 'MAIN ACCOUNT' : accountCode === 'MEME' ? 'MEME ACCOUNT' : null
+    if (accountFolder) {
+      destFolder = await ensureGoogleSubfolder(token, monthFolder, accountFolder)
+    }
   }
 
   const boundary = '-------storageupload'
