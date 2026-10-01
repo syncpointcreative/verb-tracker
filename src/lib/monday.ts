@@ -76,6 +76,20 @@ export async function listBoards(): Promise<MondayBoard[]> {
   return data.boards
 }
 
+/** Duplicate an existing board (structure only — no items) and rename the copy.
+ *  Used to spin up a new client's board from the shared onboarding template. */
+export async function duplicateBoard(boardId: string, newName: string): Promise<string> {
+  const data = await mondayQuery<{ duplicate_board: { board: { id: string } } }>(`
+    mutation($boardId: ID!, $boardName: String!) {
+      duplicate_board(board_id: $boardId, duplicate_type: duplicate_board_with_structure, board_name: $boardName) {
+        board { id }
+      }
+    }
+  `, { boardId, boardName: newName })
+
+  return data.duplicate_board.board.id
+}
+
 /** Find a board whose name contains the search string (case-insensitive).
  *  Skips "Subitems of …" boards that Monday auto-creates alongside main boards. */
 export async function findBoardByName(search: string): Promise<MondayBoard | null> {
