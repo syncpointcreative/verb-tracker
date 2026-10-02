@@ -76,7 +76,7 @@ async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
   const { data: assets } = await supabase
     .from('assets').select('posted_by')
-    .gte('date_added', monthStart).lt('date_added', monthEnd)
+    .gte('created_at', monthStart).lt('created_at', monthEnd)
     .not('posted_by', 'is', null)
   const counts: Record<string, number> = {}
   for (const a of (assets ?? [])) if (a.posted_by) counts[a.posted_by] = (counts[a.posted_by] ?? 0) + 1
