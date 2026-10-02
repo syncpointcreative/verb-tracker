@@ -22,7 +22,7 @@ export default async function ClientPage({ params, searchParams }: Props) {
     .eq('slug', params.client)
     .single()
 
-  if (!client) notFound()
+  if (!client || !client.active) notFound()
 
   // Fetch products, assets, campaigns, and brief sections in parallel
   const [

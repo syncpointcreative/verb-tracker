@@ -85,7 +85,7 @@ async function getLeaderboard(): Promise<LeaderboardEntry[]> {
 
 async function getClientSummaries(): Promise<ClientSummary[]> {
   const supabase = createServerClient()
-  const { data: clients } = await supabase.from('clients').select('*').order('name')
+  const { data: clients } = await supabase.from('clients').select('*').eq('active', true).order('name')
   if (!clients?.length) return []
 
   const clientPeriods = new Map<string, { currentStart: string; nextStart: string; billingDay: number }>()
