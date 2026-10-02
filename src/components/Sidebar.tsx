@@ -7,6 +7,7 @@ export default async function Sidebar() {
   const { data: clients } = await supabase
     .from('clients')
     .select('*')
+    .eq('active', true)
     .order('name')
 
   const { data: assets } = await supabase

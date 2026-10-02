@@ -14,7 +14,7 @@ export default async function MatrixPage() {
   const supabase = createServerClient()
 
   const [{ data: clients }, { data: products }, { data: assets }] = await Promise.all([
-    supabase.from('clients').select('*').order('name'),
+    supabase.from('clients').select('*').eq('active', true).order('name'),
     supabase.from('products').select('*').order('sort_order'),
     supabase.from('assets').select('*'),
   ])
