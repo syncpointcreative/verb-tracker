@@ -15,10 +15,11 @@
  *   ?since=2026-07-14  — only assets on or after this date (default: 30 days ago)
  *   ?move-groups=1     — move existing items out of month groups into "📥 Incoming Assets"
  *                        (applies to assets that already have a monday_item_id)
+ *   ?account=reg|meme  — required when client=flavcity (two boards, see lib/monday.ts resolveBoardName)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { parseFilename } from '@/lib/parser'
+import { parseFilename, getFlavCityAccountCode } from '@/lib/parser'
 import {
   findBoardByName,
   findOrCreateIncomingGroup,
@@ -44,6 +45,7 @@ interface AssetRow {
 interface AssetWithMonday {
   id:             string
   monday_item_id: string
+  file_name?:     string | null
 }
 
 /** Format item name as "Creator — Title" to match new-submission convention. */
@@ -78,6 +80,11 @@ export async function POST(req: NextRequest) {
   const apply      = req.nextUrl.searchParams.get('apply') === '1'
   const clientSlug = req.nextUrl.searchParams.get('client') ?? 'junkless'
   const moveGroups = req.nextUrl.searchParams.get('move-groups') === '1'
+  const accountParam = req.nextUrl.searchParams.get('account')?.trim().toUpperCase()
+
+  if (clientSlug === 'flavcity' && accountParam !== 'REG' && accountParam !== 'MEME') {
+    return NextResponse.json({ error: 'FlavCity is split across two boards — pass ?account=reg or ?account=meme' }, { status: 400 })
+  }
 
   const defaultSince = new Date()
   defaultSince.setDate(defaultSince.getDate() - 30)
@@ -86,9 +93,12 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
 
   // Look up the Monday board once (needed for both modes)
-  const board = await findBoardByName(clientSlug)
+  const boardName = clientSlug === 'flavcity'
+    ? (accountParam === 'MEME' ? 'FlavCity MEME' : 'FlavCity')
+    : clientSlug
+  const board = await findBoardByName(boardName)
   if (!board) {
-    return NextResponse.json({ error: `No Monday board found for client "${clientSlug}"` }, { status: 404 })
+    return NextResponse.json({ error: `No Monday board found for "${boardName}"` }, { status: 404 })
   }
 
   const incomingGroupId = apply || moveGroups
@@ -112,11 +122,14 @@ export async function POST(req: NextRequest) {
 
     const clientId = (clientRow as { id: string } | null)?.id
     const { data: clientAssets } = clientId
-      ? await supabase.from('assets').select('id, monday_item_id').eq('client_id', clientId).not('monday_item_id', 'is', null)
+      ? await supabase.from('assets').select('id, monday_item_id, file_name').eq('client_id', clientId).not('monday_item_id', 'is', null)
       : { data: [] }
 
-    const clientRows = ((clientAssets ?? []) as unknown as AssetWithMonday[])
-    const itemIds    = clientRows.map(r => r.monday_item_id)
+    let clientRows = ((clientAssets ?? []) as unknown as AssetWithMonday[])
+    if (clientSlug === 'flavcity') {
+      clientRows = clientRows.filter(r => getFlavCityAccountCode(r.file_name) === accountParam)
+    }
+    const itemIds = clientRows.map(r => r.monday_item_id)
 
     if (!itemIds.length) {
       return NextResponse.json({ mode: 'move-groups', clientSlug, found: 0, message: 'No Monday items found for client.' })
@@ -171,9 +184,12 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const rows = ((assets ?? []) as unknown as AssetRow[]).filter(
+  let rows = ((assets ?? []) as unknown as AssetRow[]).filter(
     a => a.client?.slug === clientSlug
   )
+  if (clientSlug === 'flavcity') {
+    rows = rows.filter(a => getFlavCityAccountCode(a.file_name) === accountParam)
+  }
 
   if (!rows.length) {
     return NextResponse.json({ mode: apply ? 'apply' : 'dry-run', clientSlug, since, found: 0, message: 'No assets to backfill.' })

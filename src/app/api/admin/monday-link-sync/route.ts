@@ -7,9 +7,11 @@
  * Query params:
  *   ?client=junkless  — client slug (default: junkless)
  *   ?apply=1          — write to Monday (default: dry-run)
+ *   ?account=reg|meme — required when client=flavcity (two boards, see lib/monday.ts resolveBoardName)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { getFlavCityAccountCode } from '@/lib/parser'
 import { findBoardByName, updateItemLinkColumn, mondayQuery } from '@/lib/monday'
 
 export const maxDuration = 300
@@ -17,6 +19,7 @@ export const maxDuration = 300
 interface AssetRow {
   id: string
   asset_name: string | null
+  file_name: string | null
   monday_item_id: string
   drive_url: string
 }
@@ -26,8 +29,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'MONDAY_API_TOKEN not configured' }, { status: 500 })
   }
 
-  const apply      = req.nextUrl.searchParams.get('apply') === '1'
-  const clientSlug = req.nextUrl.searchParams.get('client') ?? 'junkless'
+  const apply       = req.nextUrl.searchParams.get('apply') === '1'
+  const clientSlug   = req.nextUrl.searchParams.get('client') ?? 'junkless'
+  const accountParam = req.nextUrl.searchParams.get('account')?.trim().toUpperCase()
+
+  if (clientSlug === 'flavcity' && accountParam !== 'REG' && accountParam !== 'MEME') {
+    return NextResponse.json({ error: 'FlavCity is split across two boards — pass ?account=reg or ?account=meme' }, { status: 400 })
+  }
 
   const supabase = createServerClient()
 
@@ -40,21 +48,28 @@ export async function POST(req: NextRequest) {
 
   const { data: assets, error } = await supabase
     .from('assets')
-    .select('id, asset_name, monday_item_id, drive_url')
+    .select('id, asset_name, file_name, monday_item_id, drive_url')
     .eq('client_id', clientId)
     .not('monday_item_id', 'is', null)
     .not('drive_url', 'is', null)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const rows = (assets ?? []) as unknown as AssetRow[]
+  let rows = (assets ?? []) as unknown as AssetRow[]
+  if (clientSlug === 'flavcity') {
+    rows = rows.filter(r => getFlavCityAccountCode(r.file_name) === accountParam)
+  }
+
   if (!rows.length) {
     return NextResponse.json({ mode: apply ? 'apply' : 'dry-run', clientSlug, found: 0, message: 'No assets with both monday_item_id and drive_url.' })
   }
 
-  const board = await findBoardByName(clientSlug)
+  const boardName = clientSlug === 'flavcity'
+    ? (accountParam === 'MEME' ? 'FlavCity MEME' : 'FlavCity')
+    : clientSlug
+  const board = await findBoardByName(boardName)
   if (!board) {
-    return NextResponse.json({ error: `No Monday board found for "${clientSlug}"` }, { status: 404 })
+    return NextResponse.json({ error: `No Monday board found for "${boardName}"` }, { status: 404 })
   }
 
   let linkCol = board.columns.find(c => c.type === 'link')
@@ -92,6 +107,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     mode:    apply ? 'apply' : 'dry-run',
     clientSlug,
+    board:   boardName,
     found:   rows.length,
     updated: results.filter(r => r.updated).length,
     errored: results.filter(r => r.error).length,
