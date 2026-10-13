@@ -9,6 +9,8 @@
  *   ?apply=1          — write to Monday (default: dry-run)
  *   ?account=reg|meme — required when client=flavcity (two boards, see lib/monday.ts resolveBoardName)
  */
+// force-rebuild: 2026-10-13 — PR #102 was skip-deployed on an identical-tree build; this
+// comment-only change gives Vercel a distinct tree so Production actually rebuilds.
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { getFlavCityAccountCode } from '@/lib/parser'
