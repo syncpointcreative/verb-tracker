@@ -117,6 +117,16 @@ export async function POST(req: NextRequest) {
 
   const sourceBoardIds = [...new Set(needsMove.map(r => currentBoardIds.get(r.monday_item_id)!))]
 
+  if (req.nextUrl.searchParams.get('debug') === 'mapping') {
+    const sourceBoards = await getBoardsByIds(sourceBoardIds)
+    const mapping = sourceBoards.map(src => ({
+      sourceBoard: { id: src.id, name: src.name, columns: src.columns },
+      targetBoard: { id: targetBoard.id, name: targetBoard.name, columns: targetBoard.columns },
+      computedMapping: buildColumnsMapping(src, targetBoard as MondayBoard),
+    }))
+    return NextResponse.json({ mode: 'debug-mapping', mapping })
+  }
+
   if (!apply) {
     const plan = needsMove.map(r => ({
       assetId: r.id,
