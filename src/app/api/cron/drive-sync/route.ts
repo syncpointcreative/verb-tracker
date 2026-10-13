@@ -29,7 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { uploadFile } from '@/lib/storage'
-import { findBoardByName, updateItemLinkColumn, mondayQuery } from '@/lib/monday'
+import { findBoardByName, resolveBoardName, updateItemLinkColumn, mondayQuery } from '@/lib/monday'
 import { SLACK_CHANNEL_ID } from '@/lib/constants'
 
 // 300s requires Vercel Pro; Hobby plan caps at 60s regardless of this value.
@@ -249,7 +249,8 @@ async function backLinkDriveUrl(
     )
     if (!withMonday.length || !process.env.MONDAY_API_TOKEN) return
 
-    const board = await findBoardByName(clientName).catch(() => null)
+    const boardName = resolveBoardName(clientName, fileName)
+    const board = await findBoardByName(boardName).catch(() => null)
     if (!board) return
 
     let linkCol = board.columns.find(c => c.type === 'link')

@@ -8,6 +8,8 @@
  *   MONDAY_API_TOKEN  — personal API token from the Eleven Signal Monday account
  */
 
+import { getFlavCityAccountCode } from './parser'
+
 const MONDAY_API_URL = 'https://api.monday.com/v2'
 
 const MONTH_NAMES = [
@@ -101,14 +103,33 @@ export async function getBoardById(boardId: string): Promise<{ id: string; name:
 }
 
 /** Find a board whose name contains the search string (case-insensitive).
- *  Skips "Subitems of …" boards that Monday auto-creates alongside main boards. */
+ *  Skips "Subitems of …" boards that Monday auto-creates alongside main boards.
+ *  Prefers an exact name match over a substring match — needed now that board
+ *  names can themselves be substrings of each other (e.g. "FlavCity" vs
+ *  "FlavCity MEME"). */
 export async function findBoardByName(search: string): Promise<MondayBoard | null> {
   const boards = await listBoards()
   const lower  = search.toLowerCase()
-  return boards.find(b =>
+  const candidates = boards.filter(b =>
     !b.name.toLowerCase().startsWith('subitems of') &&
     b.name.toLowerCase().includes(lower)
-  ) ?? null
+  )
+  return candidates.find(b => b.name.toLowerCase() === lower) ?? candidates[0] ?? null
+}
+
+/**
+ * Resolves which Monday board a client's assets belong on. FlavCity splits into
+ * two boards by the REG/MEME account code embedded in the filename (same code
+ * Drive already uses to split subfolders — see storage.ts): MEME-coded assets go
+ * to the "FlavCity MEME" board, everything else (REG or unrecognized) stays on
+ * the original "FlavCity" board. All other clients use their client name as-is.
+ */
+export function resolveBoardName(clientName: string, fileName?: string | null): string {
+  if (clientName.trim().toLowerCase() === 'flavcity') {
+    const accountCode = getFlavCityAccountCode(fileName)
+    if (accountCode === 'MEME') return 'FlavCity MEME'
+  }
+  return clientName
 }
 
 // ── Group helpers ─────────────────────────────────────────────────────────────

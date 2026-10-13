@@ -211,6 +211,17 @@ function extractDateFromFilename(base: string): Date | null {
 }
 
 /**
+ * FlavCity's REG/MEME account code, read from a filename's 2nd segment (the
+ * account-split format's PRODUCT slot — see parseFilename above). Used to route
+ * assets to the right Drive subfolder (storage.ts) and Monday board (monday.ts).
+ */
+export function getFlavCityAccountCode(fileName: string | null | undefined): 'REG' | 'MEME' | null {
+  if (!fileName) return null
+  const code = fileName.toUpperCase().split('-')[1]
+  return code === 'REG' || code === 'MEME' ? code : null
+}
+
+/**
  * Infer funnel stage from filename and content type.
  *
  * Priority: Conversion > Consideration > Awareness (default).

@@ -36,6 +36,7 @@
  */
 
 import { createHmac, createSign } from 'crypto'
+import { getFlavCityAccountCode } from './parser'
 
 // ─── Shared interface ─────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ async function uploadToGoogle({ slackUrl, fileName, mimeType, clientName, overri
   // (MEME code) — derived from the filename's 2nd segment, same place the
   // product code normally lives (see parser.ts's account-split format).
   if (clientName.trim().toLowerCase() === 'flavcity') {
-    const accountCode = fileName.toUpperCase().split('-')[1]
+    const accountCode = getFlavCityAccountCode(fileName)
     const accountFolder = accountCode === 'REG' ? 'MAIN ACCOUNT' : accountCode === 'MEME' ? 'MEME ACCOUNT' : null
     if (accountFolder) {
       destFolder = await ensureGoogleSubfolder(token, monthFolder, accountFolder)

@@ -28,6 +28,7 @@ import {
   findOrCreateIncomingGroup,
   findUserByName,
   createContentItem,
+  resolveBoardName,
   type MondayBoard,
   type MondayUser,
 } from '@/lib/monday'
@@ -183,30 +184,31 @@ async function createMondayItemsForApproval(
   let libby: MondayUser | null = null
   try { libby = await findUserByName('libby') } catch { /* unassigned is fine */ }
 
-  // Group by client to minimise board lookups (one listBoards() call per client)
-  const byClientId = new Map<string, typeof assets>()
+  // Group by client + resolved board name — minimises board lookups, and keeps
+  // FlavCity's REG/MEME assets split into separate buckets since they route to
+  // two different boards (see resolveBoardName in lib/monday.ts).
+  const byBoardBucket = new Map<string, { boardName: string; assets: typeof assets }>()
   for (const asset of assets) {
     // Skip assets that already have a Monday item — prevents duplicates on double-reaction
     if (asset.monday_item_id) continue
-    const clientId = (asset.client as unknown as { id: string } | null)?.id
-    if (!clientId) continue
-    if (!byClientId.has(clientId)) byClientId.set(clientId, [])
-    byClientId.get(clientId)!.push(asset)
+    const client = asset.client as unknown as { id: string; name: string } | null
+    if (!client) continue
+    const boardName = resolveBoardName(client.name, asset.file_name)
+    const bucketKey  = `${client.id}::${boardName}`
+    if (!byBoardBucket.has(bucketKey)) byBoardBucket.set(bucketKey, { boardName, assets: [] })
+    byBoardBucket.get(bucketKey)!.assets.push(asset)
   }
 
-  for (const [, clientAssets] of byClientId) {
-    const client = clientAssets[0].client as unknown as { id: string; name: string } | null
-    if (!client) continue
-
+  for (const { boardName, assets: clientAssets } of byBoardBucket.values()) {
     let board: MondayBoard | null = null
     try {
-      board = await findBoardByName(client.name)
+      board = await findBoardByName(boardName)
     } catch (err) {
-      console.error(`[slack/monday] board lookup failed for ${client.name}:`, err)
+      console.error(`[slack/monday] board lookup failed for ${boardName}:`, err)
       continue
     }
     if (!board) {
-      console.warn(`[slack/monday] no board found for client "${client.name}" — skipping`)
+      console.warn(`[slack/monday] no board found for "${boardName}" — skipping`)
       continue
     }
 
