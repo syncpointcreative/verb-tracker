@@ -92,6 +92,20 @@ export async function duplicateBoard(boardId: string, newName: string): Promise<
   return data.duplicate_board.board.id
 }
 
+/** Fetch full board structure (groups + columns) for specific board IDs. */
+export async function getBoardsByIds(boardIds: string[]): Promise<MondayBoard[]> {
+  const data = await mondayQuery<{ boards: MondayBoard[] }>(`
+    query($ids: [ID!]) {
+      boards(ids: $ids) {
+        id name
+        groups { id title }
+        columns { id title type }
+      }
+    }
+  `, { ids: boardIds })
+  return data.boards
+}
+
 /** Look up a board by ID regardless of board_kind (public/private/share) or state. */
 export async function getBoardById(boardId: string): Promise<{ id: string; name: string; board_kind: string; state: string } | null> {
   const data = await mondayQuery<{ boards: Array<{ id: string; name: string; board_kind: string; state: string }> }>(`
@@ -264,6 +278,49 @@ export async function moveItemToGroup(itemId: string, groupId: string): Promise<
       move_item_to_group(item_id: $itemId, group_id: $groupId) { id }
     }
   `, { itemId, groupId })
+}
+
+export interface ColumnMapping { source: string; target: string }
+
+/** Match source → target columns by exact title (case-insensitive), falling
+ *  back to type when no title match is available. Used when moving items
+ *  between two boards with the same structure but different column IDs
+ *  (e.g. a board created via duplicateBoard). */
+export function buildColumnsMapping(source: MondayBoard, target: MondayBoard): ColumnMapping[] {
+  const mapping: ColumnMapping[] = []
+  const usedTargets = new Set<string>()
+
+  for (const col of source.columns) {
+    const byTitle = target.columns.find(t =>
+      !usedTargets.has(t.id) && t.title.toLowerCase() === col.title.toLowerCase()
+    )
+    const match = byTitle ?? target.columns.find(t => !usedTargets.has(t.id) && t.type === col.type)
+    if (match) {
+      mapping.push({ source: col.id, target: match.id })
+      usedTargets.add(match.id)
+    }
+  }
+
+  return mapping
+}
+
+/** Move an item to a different board (and group), carrying over column values
+ *  via an explicit source→target column mapping (see buildColumnsMapping). */
+export async function moveItemToBoard(
+  itemId:         string,
+  targetBoardId:  string,
+  targetGroupId:  string,
+  columnsMapping: ColumnMapping[],
+): Promise<string> {
+  const data = await mondayQuery<{ move_item_to_board: { id: string } }>(`
+    mutation($itemId: ID!, $boardId: ID!, $groupId: String!, $mapping: [ColumnMappingInput]) {
+      move_item_to_board(item_id: $itemId, board_id: $boardId, group_id: $groupId, columns_mapping: $mapping) {
+        id
+      }
+    }
+  `, { itemId, boardId: targetBoardId, groupId: targetGroupId, mapping: columnsMapping })
+
+  return data.move_item_to_board.id
 }
 
 // ── Item updates ──────────────────────────────────────────────────────────────
