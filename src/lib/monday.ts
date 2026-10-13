@@ -313,7 +313,7 @@ export async function moveItemToBoard(
   columnsMapping: ColumnMapping[],
 ): Promise<string> {
   const data = await mondayQuery<{ move_item_to_board: { id: string } }>(`
-    mutation($itemId: ID!, $boardId: ID!, $groupId: String!, $mapping: [ColumnMappingInput]) {
+    mutation($itemId: ID!, $boardId: ID!, $groupId: ID!, $mapping: [ColumnMappingInput]) {
       move_item_to_board(item_id: $itemId, board_id: $boardId, group_id: $groupId, columns_mapping: $mapping) {
         id
       }
