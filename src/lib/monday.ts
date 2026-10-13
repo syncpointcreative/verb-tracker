@@ -282,17 +282,24 @@ export async function moveItemToGroup(itemId: string, groupId: string): Promise<
   `, { itemId, groupId })
 }
 
-export interface ColumnMapping { source: string; target: string }
+export interface ColumnMapping { source: string; target: string | null }
 
 /** Match source → target columns by exact title (case-insensitive), falling
  *  back to type when no title match is available. Used when moving items
  *  between two boards with the same structure but different column IDs
- *  (e.g. a board created via duplicateBoard). */
+ *  (e.g. a board created via duplicateBoard).
+ *
+ *  Monday's move_item_to_board requires an entry for every non-formula
+ *  source column — unmatched columns must still appear with target: null
+ *  (their data is dropped), and formula columns can't be mapped at all so
+ *  they're left out entirely. */
 export function buildColumnsMapping(source: MondayBoard, target: MondayBoard): ColumnMapping[] {
   const mapping: ColumnMapping[] = []
   const usedTargets = new Set<string>()
 
   for (const col of source.columns) {
+    if (col.type === 'formula') continue
+
     const byTitle = target.columns.find(t =>
       !usedTargets.has(t.id) && t.title.toLowerCase() === col.title.toLowerCase()
     )
@@ -300,6 +307,8 @@ export function buildColumnsMapping(source: MondayBoard, target: MondayBoard): C
     if (match) {
       mapping.push({ source: col.id, target: match.id })
       usedTargets.add(match.id)
+    } else {
+      mapping.push({ source: col.id, target: null })
     }
   }
 
