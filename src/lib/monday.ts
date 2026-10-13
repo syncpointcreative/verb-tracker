@@ -7,6 +7,8 @@
  * Env var required:
  *   MONDAY_API_TOKEN  — personal API token from the Eleven Signal Monday account
  */
+// force-rebuild: 2026-10-13 — PR #105's merge tree matched its already-built
+// preview, so Vercel skip-deployed Production; this gives it a distinct tree.
 
 import { getFlavCityAccountCode } from './parser'
 
