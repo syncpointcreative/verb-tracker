@@ -114,6 +114,7 @@ const PRODUCT_CODES_BY_CLIENT: {
       { code: 'NHC', name: 'Nashville Hot Chicken' },
       { code: 'SBC', name: 'Savory Breakfast Chicken' },
       { code: 'CTP', name: 'Chicken Trial Pack' },
+      { code: 'BTP', name: 'Beef Trial Pack' },
     ],
   },
   {
