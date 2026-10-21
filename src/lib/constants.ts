@@ -84,6 +84,7 @@ export const PRODUCT_CODES: Record<string, string> = {
   OTK: 'Original Turkey', VAR: 'Variety Pack',
   OGC: 'Original Chicken', NHC: 'Nashville Hot Chicken',
   SBC: 'Savory Breakfast Chicken', CTP: 'Chicken Trial Pack',
+  BTP: 'Beef Trial Pack',
   HH: 'Himalayan Honey (2lb Tub)',
   OBL: 'Ocean Breeze Laundry Detergent Sheets',
   DP: 'Dishwashing Eco Pods', LDS: 'Lemon Detergent Eco Sheets for Dishwashing',
